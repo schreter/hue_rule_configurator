@@ -9,6 +9,7 @@ import requests
 import json
 import re
 import pprint
+from copy import deepcopy
 
 VAR_PATTERN = re.compile("\\${([^}:]+):([^}]+)}")
 SCENE_PATTERN = re.compile("^([^:]+):(.*)$")
@@ -17,11 +18,16 @@ BUTTON_MAP = {
     # mapping for dimmer
     "on": "1000",
     "on-hold": "1001",
+    "on-release": "1003",
     "brighter": "2000",
     "brighter-hold": "2001",
+    "brighter-release": "2003",
     "darker": "3000",
     "darker-hold": "3001",
+    "darker-release": "3003",
     "off": "4000",
+    "off-hold": "4001",
+    "off-release": "4003",
     # mapping for tap switches (normal)
     "1": "34",
     "2": "16",
@@ -370,14 +376,39 @@ class HueBridge():
         rule = {
             "name": name,
             "status": "enabled",
-            "recycle": False,
             "conditions": conditions,
             "actions": actions + sceneActions
         }
         if "timeout" in config:
-            # add rule to turn off light after timeout
-            timeout = config["timeout"]
-            # TODO create second rule based on rule and modify its dx condition to ddx with timeout
+            # create second rule based on rule to turn off light and modify its dx condition to ddx with timeout
+            """ NOTE: this doesn't work yet, since state after a timeout is different. Use schedules instead.
+            timeout = "PT" + config["timeout"]
+            conditions2 = deepcopy(conditions)
+            founddx = False
+            for cond in conditions2:
+                if cond["operator"] == "dx":
+                    cond["operator"] = "ddx"
+                    cond["value"] = timeout
+                    founddx = True
+                    break
+            if not founddx:
+                raise Exception("Trying to add timeout for rule w/o dx operator: " + str(rule))
+            rule2 = {
+                "name": name + "/TO",
+                "status": "enabled",
+                "conditions": conditions2,
+                "actions": [
+                    {
+                        "address": "/groups/" + groupID + "/action",
+                        "method": "PUT",
+                        "body": {
+                            "on": False
+                        }
+                    }
+                ]
+            }
+            return [rule, rule2]
+            """
             return [rule]
         else:
             return [rule]
@@ -556,6 +587,31 @@ class HueBridge():
         
         return rules
 
+    def __dimRules(self, binding, name, ref, state, conditions, actions):
+        """ Rules for dimming or lightening a group """
+        state = self.__parseCommon(binding, state)
+        groupID = self.__groups_idx[state["group"]]
+        value = binding["value"]
+        tt = 9
+        if "tt" in binding:
+            tt = binding["tt"]
+        body = { "bri_inc" : value }
+        if tt != 0:
+            body["transitiontime"] = tt
+        rule = {
+            "name": name + "/" + ref,
+            "status": "enabled",
+            "conditions": conditions,
+            "actions": actions + [
+                {
+                    "address": "/groups/" + groupID + "/action",
+                    "method": "PUT",
+                    "body": body
+                }
+            ]
+        }
+        return [rule]
+
     def __createRulesForAction(self, binding, name, ref, state, conditions = [], actions = []):
         state = self.__parseCommon(binding, state)
         tp = binding["type"]
@@ -567,6 +623,8 @@ class HueBridge():
             return self.__sceneRules(binding, name, ref, state, conditions, actions)
         elif tp == "light":
             return self.__lightRules(binding, name, ref, state, conditions, actions)
+        elif tp == "dim":
+            return self.__dimRules(binding, name, ref, state, conditions, actions)
         else:
             raise Exception("Invalid binding type '" + tp + "'")
     
@@ -806,7 +864,7 @@ class HueBridge():
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
                     "operator": "ddx",
-                    "value": desc["timeout"]
+                    "value": "PT" + desc["timeout"]
                 },
                 {
                     "address": "/groups/" + groupID + "/state/any_on",
@@ -880,7 +938,7 @@ class HueBridge():
         #            if state is still 2, turn lights off and enter state 0 (off)
         dimtime = "PT00:00:20"
         if "dimtime" in desc:
-            dimtime = desc["dimtime"]
+            dimtime = "PT" + desc["dimtime"]
         conditions = [
             {
                 "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
@@ -1291,7 +1349,7 @@ class HueBridge():
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
                     "operator": "ddx",
-                    "value": desc["timeout"]
+                    "value": "PT" + desc["timeout"]
                 },
                 {
                     "address": "/groups/" + groupID + "/state/any_on",
@@ -1620,6 +1678,8 @@ class HueBridge():
         for i in deleteSensorIDs:
             self.__deleteSensor(i)
         
+        # TODO delete resource
+
         # create any sensors needed to represent switch states
         #print("Sensors to create:")
         #pprint.pprint(newSensors)
@@ -1634,3 +1694,5 @@ class HueBridge():
         #pprint.pprint(newRules)
         for i in newRules:
             self.__createRule(i)
+
+        # TODO create resource with links to all new rules and sensors
