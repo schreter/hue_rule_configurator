@@ -49,6 +49,22 @@ BUTTON_MAP = {
     }
 
 class HueBridge():
+    """
+    Class for configuring various sensor rules in Philips Hue bridge using a simple JSON description
+
+    See README.md for description of the configuration.
+    """
+
+    # Rules to append to bindings for a dimmer for dimming up/down. Requires group set in descriptor.
+    DIMMER_RULES = {
+        "brighter": { "type": "dim", "value": 30 },
+        "brighter-hold": { "type": "dim", "value": 56 },
+        "brighter-release": { "type": "dim", "value": 0, "tt": 0 },
+        "darker": { "type": "dim", "value": -30 },
+        "darker-hold": { "type": "dim", "value": -56 },
+        "darker-release": { "type": "dim", "value": 0, "tt": 0 }
+    }
+
     def __init__(self, bridge, apiKey):
         self.bridge = bridge
         self.apiKey = apiKey
@@ -1621,6 +1637,8 @@ class HueBridge():
         return [newSensors, newRules, deleteSensorIDs, deleteRuleIDs]
 
     def configure(self, config):
+        """ Configure the bridge. See README.md for config structure """
+
         # first collect rules and sensors to delete
         deleteSensorIDs = []
         deleteRuleIDs = []
