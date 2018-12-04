@@ -13,6 +13,7 @@ from copy import deepcopy
 
 VAR_PATTERN = re.compile("\\${([^}:]+):([^}]+)}")
 SCENE_PATTERN = re.compile("^([^:]+):(.*)$")
+OFF_BINDING = { "type": "scene", "configs": [ {"scene": "off"} ] }
 
 BUTTON_MAP = {
     # mapping for dimmer
@@ -213,7 +214,11 @@ class HueBridge():
         print("Deleted rule", ruleID, name)
         
     def __createRule(self, ruleData):
-        name = ruleData["name"]
+        fullname = ruleData["name"]
+        name = fullname[0:32]
+        if name != fullname:
+            print("WARNING: Shortening rule name '" + fullname + "' to '" + name + "'")
+            ruleData["name"] = name
         tmp = requests.post(self.urlbase + "/rules", json=ruleData)
         if tmp.status_code != 200:
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
@@ -344,14 +349,14 @@ class HueBridge():
             state["group"] = desc["group"]
         return state
     
-    def __redirectRule(self, binding, name, ref, conditions):
+    def __redirectRule(self, binding, name, ref, conditions, actions):
         value = binding["value"]
         return {
-            "name": name + " " + ref + "->" + value,
+            "name": name + "/" + ref + "=" + value,
             "status": "enabled",
             "recycle": False,
             "conditions": conditions,
-            "actions": [
+            "actions": actions + [
                 {
                     "address": "/sensors/" + self.__extinput + "/state",
                     "method": "PUT",
@@ -440,6 +445,17 @@ class HueBridge():
         if multistate and not "state" in state and not "times" in binding:
             raise Exception("Missing state configuration for a multistate config w/o times for " + name + "/" + ref)
         secondaryState = state["stateUse"] == "secondary";
+
+        resetstateactions = []
+        if "state" in state:
+            resetstateactions = [
+                {
+                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                    "method": "PUT",
+                    "body": { "status": 0 }
+                }
+            ]
+
         for config in configs:
             print("Process",name,index,config)
             cname = name + "/" + ref;
@@ -487,7 +503,7 @@ class HueBridge():
                                 "value": timerange
                             }
                         ]
-                        stateAction = []
+                        stateAction = resetstateactions
                         if multistate and "state" in state:
                             # only trigger if state not yet set
                             stateCond += [
@@ -497,7 +513,7 @@ class HueBridge():
                                     "value": str(-1 if secondaryState else 1)
                                 }
                             ]
-                            stateAction += [
+                            stateAction = [
                                 {
                                     "address": "/sensors/${sensor:" + state["state"] + "}/state",
                                     "method": "PUT",
@@ -506,7 +522,7 @@ class HueBridge():
                                     }
                                 }
                             ]
-                        rules += self.__singleSceneRules(config, cname + "/T" + str(tidx), state, conditions + stateCond, actions + stateAction)
+                        rules += self.__singleSceneRules(config, cname + "/T" + str(tidx), state, conditions + stateCond, stateAction + actions)
                     tidx = tidx + 1
             elif index == 0:
                 if multistate and "state" in state:
@@ -530,7 +546,7 @@ class HueBridge():
                     rules += self.__singleSceneRules(config, cname + "/in", state, conditions + stateCond, actions + stateAction)
                 else:
                     # single config, no additional conditions
-                    rules += self.__singleSceneRules(config, cname, state, conditions, actions)
+                    rules += self.__singleSceneRules(config, cname, state, conditions, resetstateactions + actions)
             index = index + 1
         return rules
         
@@ -631,16 +647,27 @@ class HueBridge():
     def __createRulesForAction(self, binding, name, ref, state, conditions = [], actions = []):
         state = self.__parseCommon(binding, state)
         tp = binding["type"]
+        resetstateactions = []
+        if "state" in state:
+            resetstateactions = [
+                {
+                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                    "method": "PUT",
+                    "body": { "status": 0 }
+                }
+            ]
         if tp == "redirect":
             # NOTE: explicitly ignore passed actions, since they reset external input to 1, when called for external
-            rule = self.__redirectRule(binding, name, ref, conditions)
+            rule = self.__redirectRule(binding, name, ref, conditions, resetstateactions)
             return [rule]
         elif tp == "scene":
             return self.__sceneRules(binding, name, ref, state, conditions, actions)
+        elif tp == "off":
+            return self.__sceneRules(OFF_BINDING, name, ref, state, conditions, actions)
         elif tp == "light":
-            return self.__lightRules(binding, name, ref, state, conditions, actions)
+            return self.__lightRules(binding, name, ref, state, conditions, resetstateactions + actions)
         elif tp == "dim":
-            return self.__dimRules(binding, name, ref, state, conditions, actions)
+            return self.__dimRules(binding, name, ref, state, conditions, resetstateactions + actions)
         else:
             raise Exception("Invalid binding type '" + tp + "'")
     
@@ -978,6 +1005,15 @@ class HueBridge():
         ]
         if offactions:
             # explicit off action specified
+            if "switchstate" in desc:
+                # reset switch state before turning off the light
+                actions.append(
+                    {
+                        "address": "/sensors/${sensor:" + desc["switchstate"] + "}/state",
+                        "method": "PUT",
+                        "body": { "status": 0 }
+                    }
+                )
             rules += self.__createRulesForAction(offactions, name, "off", state, conditions, actions)
         else:
             # no off action, add default one (group off)

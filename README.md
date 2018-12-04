@@ -68,6 +68,7 @@ Following symbolic names are supported:
   `brighter-release`, `darker`, `darker-hold`, `darker-release`, `off`, `off-hold` and
   `off-release` for Philips dimmer buttons
 
+TODO describe sensor parameter for switch and external and implement it to disable sensor for some time.
 
 ### External sensor
 
@@ -153,14 +154,14 @@ Example:
     "timeout": "00:00:45",
     "dimtime": "00:00:15",
     "contact": "Bathroom door contact",
+    "state": "Bathroom switch state",
     "bindings": {
         "on": {
             "type": "scene",
             "configs": [ {"scene": "Bright"} ]
         },
         "off": {
-            "type": "scene",
-            "configs": [ {"scene": "off"} ]
+            "type": "off"
         }
     }
 }
@@ -175,16 +176,25 @@ is dimmed (currently hard-coded action). After further timeout specified using `
 (which defaults to 20 seconds) the light is turned on completely. If there is a motion detected
 during dim time, the light is restored to full light and the timeout starts anew.
 
+Binding for `off` is optional and defaults to turning off the lights. Binding for `on` is also
+optional, if not specified, the lights won't be turned on automatically (just turned off).
+
+If the optional `state` is present, then the sensor with this name will be reset before
+turning light on or off.
+
 Optionally, a contact sensor defined in the same configuration can be addressed using `contact`
 parameter. When there is no motion detected shortly after closing the door, the light is turned
 off, else it is kept on until the door is open again (and then normal rules with timeout apply).
 As already mentioned, this is extremely useful for bathroom.
+
+TODO add binding for dimming lights
 
 
 ## Action types
 
 For each binding, there must be an action specified. Currently, following actions are supported:
 - `scene` - set scene (supports multi-scene and time-dependent scenes)
+- `off` - turn a group of lights off
 - `light` - turn a single light on, off or toggle its state
 - `dim` - dim up or down a group
 - `redirect` - redirect to another action by setting value of `ExternalInput` sensor
@@ -237,6 +247,9 @@ reset after some timeout, so when the action is repeated (e.g., light switched o
 is selected. Multiple action triggers (e.g., multiple light switch presses) cycle through scenes
 in configuration.
 
+A special scene `off` is used to turn all lights in the group off. In case the entire scene action
+should just turn lights off, you can also use action type `off` instead.
+
 If an optional `times` parameter is specified, then instead of starting with the first scene,
 the current time is compared against specified intervals and the scene at the associated index
 is recalled (0-based, i.e., `Night` scene in the above example has index 0). If there is no
@@ -246,6 +259,26 @@ Additional `timeout` parameter can be specified for a configuration of the scene
 after the specified timeout (unless another action was triggered).
 
 NOTE: timeout doesn't work yet.
+
+
+### Off
+
+Example:
+```python
+{
+	...,
+	"bindings": {
+        "on": {
+            "type": "scene",
+            "configs": [ {"scene": "Bright"} ]
+        },
+        "off": { "type": "off" }
+    }
+}
+```
+
+Use action type `off` to turn lights of the group off. This is shorthand for
+`{ "type": "scene", "configs": [ {"scene": "off"} ] }`.
 
 
 ### Light
@@ -410,10 +443,7 @@ CONFIG_WC = [
                 "type": "scene",
                 "configs": [ {"scene": "Bright"} ]
             },
-            "off": {
-                "type": "scene",
-                "configs": [ {"scene": "off"} ]
-            }
+            "off": { "type": "off" }
         }
     }
 ]
