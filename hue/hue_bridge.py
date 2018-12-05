@@ -347,16 +347,13 @@ class HueBridge():
             state["stateUse"] = "primary"
         if "group" in desc:
             state["group"] = desc["group"]
+        if "sensor" in desc:
+            state["sensor"] = desc["sensor"]
         return state
     
-    def __redirectRule(self, binding, name, ref, conditions, actions):
+    def __redirectRule(self, binding, name, ref, state, conditions, actions):
         value = binding["value"]
-        return {
-            "name": name + "/" + ref + "=" + value,
-            "status": "enabled",
-            "recycle": False,
-            "conditions": conditions,
-            "actions": actions + [
+        resetActions = [
                 {
                     "address": "/sensors/" + self.__extinput + "/state",
                     "method": "PUT",
@@ -365,12 +362,33 @@ class HueBridge():
                     }
                 }
             ]
+        if "sensor" in state and state["sensor"]:
+            sensorName = state["sensor"] + " state"
+            resetActions.append(
+                {
+                    "address": "/sensors/${sensor:" + sensorName + "}/state",
+                    "method": "PUT",
+                    "body": {
+                        "status": -1
+                    }
+                }
+            )
+        return {
+            "name": name + "/" + ref + "=" + value,
+            "status": "enabled",
+            "recycle": False,
+            "conditions": conditions,
+            "actions": actions + resetActions
         }
         
     def __singleSceneRules(self, config, name, state, conditions, actions):
         """ Rules for a single config """            
         scene = config["scene"]
         group = state["group"]
+        sensorName = None
+        if "sensor" in state and state["sensor"]:
+            sensorName = state["sensor"] + " state"
+
         groupID = self.__groups_idx[group]
         sceneActions = []
         if scene == "off":
@@ -383,6 +401,14 @@ class HueBridge():
                     }
                 }
             ]
+            if sensorName:
+                sceneActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + sensorName + "}/state",
+                        "method": "PUT",
+                        "body": { "status": -2 }
+                    }
+                )
         else:
             sceneID = self.__scenes_idx[groupID][scene]
             sceneActions = [
@@ -394,6 +420,14 @@ class HueBridge():
                     }
                 }
             ]
+            if sensorName:
+                sceneActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + sensorName + "}/state",
+                        "method": "PUT",
+                        "body": { "status": -1 }
+                    }
+                )
         rule = {
             "name": name,
             "status": "enabled",
@@ -556,24 +590,52 @@ class HueBridge():
         lightID = self.findLight(binding["light"])
         action = binding["action"]
         rules = []
+        sensorName = None
+        if "sensor" in state and state["sensor"]:
+            sensorName = state["sensor"] + " state"
         if action == "on" or action == "off":
+            lightActions = [
+                {
+                    "address": "/lights/" + lightID + "/action",
+                    "method": "PUT",
+                    "body": {
+                        "on": True if action == "on" else False
+                    }
+                }
+            ]
+            if sensorName:
+                lightActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + sensorName + "}/state",
+                        "method": "PUT",
+                        "body": { "status": -1 if action == "on" else -2 }
+                    }
+                )
+
             rule = {
                 "name": name,
                 "status": "enabled",
                 "recycle": False,
                 "conditions": conditions,
-                "actions": actions + [
-                    {
-                        "address": "/lights/" + lightID + "/action",
-                        "method": "PUT",
-                        "body": {
-                            "on": True if action == "on" else False
-                        }
-                    }
-                ]
+                "actions": actions + lightActions
             }
             rules.append(rule)
         elif action == "toggle":
+            lightActions = [
+                {
+                    "address": "/lights/" + lightID + "/state",
+                    "method": "PUT",
+                    "body": { "on": True }
+                }
+            ]
+            if sensorName:
+                lightActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + sensorName + "}/state",
+                        "method": "PUT",
+                        "body": { "status": -1 }
+                    }
+                )
             rule = {
                 "name": name + " toggle ON",
                 "status": "enabled",
@@ -585,15 +647,24 @@ class HueBridge():
                         "value": "false"
                     }
                 ],
-                "actions": actions + [
-                    {
-                        "address": "/lights/" + lightID + "/state",
-                        "method": "PUT",
-                        "body": { "on": True }
-                    }
-                ]
+                "actions": actions + lightActions
             }
             rules.append(rule)
+            lightActions = [
+                {
+                    "address": "/lights/" + lightID + "/state",
+                    "method": "PUT",
+                    "body": { "on": False }
+                }
+            ]
+            if sensorName:
+                lightActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + sensorName + "}/state",
+                        "method": "PUT",
+                        "body": { "status": -2 }
+                    }
+                )
             rule = {
                 "name": name + " toggle OFF",
                 "status": "enabled",
@@ -605,13 +676,7 @@ class HueBridge():
                         "value": "true"
                     }
                 ],
-                "actions": actions + [
-                    {
-                        "address": "/lights/" + lightID + "/state",
-                        "method": "PUT",
-                        "body": { "on": False }
-                    }
-                ]
+                "actions": actions + lightActions
             }
             rules.append(rule)
         else:
@@ -658,7 +723,7 @@ class HueBridge():
             ]
         if tp == "redirect":
             # NOTE: explicitly ignore passed actions, since they reset external input to 1, when called for external
-            rule = self.__redirectRule(binding, name, ref, conditions, resetstateactions)
+            rule = self.__redirectRule(binding, name, ref, state, conditions, resetstateactions)
             return [rule]
         elif tp == "scene":
             return self.__sceneRules(binding, name, ref, state, conditions, actions)
@@ -746,6 +811,7 @@ class HueBridge():
            - 1: the light is on, we are in timeout phase
            - 2: the light is in dimmed state
            - 3: the light is on and updates are blocked by door contact
+           - -1 and -2: timeouts for switch on/off, sensor doesn't react
         
         Following states and transitions are used:
             - 0: initial state, no motion, lights are off *or* motion not detected anymore, lights are on
@@ -776,12 +842,16 @@ class HueBridge():
                     if no motion is detected and state is still 3
                     turn lights off and switch to state 0
                 when door contact goes to open,
-                    rule(10): switch to state 1 if motion is currently detected
-                    rule(11): switch to state 0 otherwise
+                    rule(10): switch to state 1, independent of motion (rule(4) will switch to state 0)
+        If timeouts for switch on/off are used:
+            - -1 and -2: timeout on switch on/off is active
+                rule(11): after on timeout, change state -1->1 (which will transition to 0 upon no motion)
+                rule(12): after off timeout, change state -2->0
                     
-        If a switch is used to turn on lights, then the switch should in addition to setting light actions also:
-            - transition to state 1 when turning lights on, unless already in state 3
-            - transition to state 0 when turning lights off
+        If a switch is used to turn on lights and has a sensor associated, then the switch should in addition
+        to setting light actions also:
+            - transition to state -1 when turning lights on, unless already in state 3
+            - transition to state -2 when turning lights off
         """
 
         state = self.__parseCommon(desc)
@@ -807,6 +877,8 @@ class HueBridge():
             raise Exception("Missing scene '" + sceneName + "'")
         sceneID = self.__scenes_idx[groupID][sceneName]
         
+        # TODO if state parameter provided, reset state of the associated switch when turning lights on/off
+        
         rules = []
         conditions = []        
         actions = []
@@ -826,6 +898,7 @@ class HueBridge():
         # rule(1): motion detected in dark and lights off: turn on lights and switch to state 1
         if onactions:
             # only create if we have any on-action
+            # TODO need to create also for no on-action to go to state 1
             conditions = [
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
@@ -837,12 +910,12 @@ class HueBridge():
                     "operator": "eq",
                     "value": "true"
                 },
-                # NOTE: do not test for current state, react in any state (e.g., closed door in state 3 and lights off)
-                #{
-                #    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                #    "operator": "eq",
-                #    "value": "0"
-                #},
+                # NOTE: react in any state except blocked by switch (e.g., closed door in state 3 and lights off)
+                {
+                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                    "operator": "gt",
+                    "value": "-1"
+                },
                 {
                     "address": "/groups/" + groupID + "/state/any_on",
                     "operator": "eq",
@@ -904,8 +977,14 @@ class HueBridge():
                     "operator": "eq",
                     "value": "false"
                 },
+                #{
+                #    "address": "/sensors/" + sensorID + "/state/presence",
+                #    "operator": "ddx",
+                #    "value": "PT" + desc["timeout"]
+                #},
+                # ddx on last update of state sensor to turn off also after switching light on w/o movement
                 {
-                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
                     "operator": "ddx",
                     "value": "PT" + desc["timeout"]
                 },
@@ -1245,40 +1324,17 @@ class HueBridge():
                 }
             ]
 
-        return rules
-                    
-    def __rulesForMotionOld(self, sensorID, desc):
-        """ Old-style rules for motion sensor, just for reference """
-        state = self.__parseCommon(desc)
-        groupID = self.__groups_idx[state["group"]]
-        bindings = desc["bindings"]
-        name = desc["name"]
-        stateSensorName = desc["state"]
-        if not "group" in state:
-            raise Exception("No group set for motion sensor '" + name + "'")
-        sensorAddress = self.__sensors[sensorID]["uniqueid"][0:24]
-        lightSensorID = None
-        for key in self.__sensors.keys():
-            s = self.__sensors[key]
-            if s["type"] != "ZLLLightLevel":
-                continue
-            if s["uniqueid"][0:24] == sensorAddress:
-                lightSensorID = key
-                break
-        if not lightSensorID:
-            raise Exception("Light level sensor for '" + name + "' not found")
-        sceneName = name + " restore"
-        if not sceneName in self.__scenes_idx[groupID]:
-            raise Exception("Missing scene '" + sceneName + "'")
-        sceneID = self.__scenes_idx[groupID][sceneName]
+        # Handling for states -1 and -2 for timeouts on switch on/off
+        # TODO add only if necessary
         
-        rules = []
-        conditions = []        
-        actions = []
-        for act in bindings.keys():
-            binding = bindings[act]
-            if act == "on":
-                actions = [
+        # rule(11): after on timeout, change state -1->1 (which will transition to 0 upon no motion)
+        ontimeout = "PT00:00:30"
+        if "ontimeout" in desc:
+            ontimeout = "PT" + desc["ontimeout"]
+        rules.append(
+            {
+                "name": name + "/on.switch",
+                "actions" : [
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state",
                         "method": "PUT",
@@ -1286,53 +1342,29 @@ class HueBridge():
                             "status": 1
                         }
                     }
-                ]
-                conditions = [
-                    {
-                        "address": "/sensors/" + sensorID + "/state/presence",
-                        "operator": "eq",
-                        "value": "true"
-                    },
+                ],
+                "conditions" : [
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                        "operator": "lt",
-                        "value": "1"
-                    },
-                    {
-                        "address": "/sensors/" + lightSensorID + "/state/dark",
                         "operator": "eq",
-                        "value": "true"
+                        "value": "-1"
                     },
                     {
-                        "address": "/sensors/" + sensorID + "/state/presence",
-                        "operator": "dx"
+                        "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
+                        "operator": "ddx",
+                        "value": ontimeout
                     }
                 ]
-                rules += self.__createRulesForAction(binding, name, "on.pres", state, conditions, actions)
-                conditions = [
-                    {
-                        "address": "/sensors/" + sensorID + "/state/presence",
-                        "operator": "eq",
-                        "value": "true"
-                    },
-                    {
-                        "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                        "operator": "lt",
-                        "value": "1"
-                    },
-                    {
-                        "address": "/sensors/" + lightSensorID + "/state/dark",
-                        "operator": "eq",
-                        "value": "true"
-                    },
-                    {
-                        "address": "/sensors/" + lightSensorID + "/state/dark",
-                        "operator": "dx"
-                    }
-                ]
-                rules += self.__createRulesForAction(binding, name, "on.dark", state, conditions, actions)
-            elif act == "off":
-                actions = [
+            }
+        )
+        # rule(12): after off timeout, change state -2->0
+        offtimeout = "PT00:00:30"
+        if "ontimeout" in desc:
+            offtimeout = "PT" + desc["offtimeout"]
+        rules.append(
+            {
+                "name": name + "/off.switch",
+                "actions" : [
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state",
                         "method": "PUT",
@@ -1340,267 +1372,23 @@ class HueBridge():
                             "status": 0
                         }
                     }
-                ]
-                conditions = [
-                    {
-                        "address": "/sensors/" + sensorID + "/state/presence",
-                        "operator": "eq",
-                        "value": "false"
-                    },
+                ],
+                "conditions" : [
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                        "operator": "eq",
+                        "value": "-2"
+                    },
+                    {
+                        "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
                         "operator": "ddx",
-                        "value": "PT00:00:30"
-                    },
-                    {
-                        "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                        "operator": "eq",
-                        "value": "2"
+                        "value": offtimeout
                     }
                 ]
-                rules += self.__createRulesForAction(binding, name, "off", state, conditions, actions)
+            }
+        )
         
-        # add re-arming, when the light is off and sensor shows no presence
-        rule = {
-            "name": name + "/arm",
-            "recycle": False,
-            "conditions": [
-                {
-                    "address": "/groups/" + groupID + "/state/any_on",
-                    "operator": "eq",
-                    "value": "false"
-                },
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "eq",
-                    "value": "false"
-                }
-            ],
-            "actions": [
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                    "method": "PUT",
-                    "body": {
-                        "status": 0
-                    }
-                }
-            ]
-        }
-        rules.append(rule)
-
-        # add dimming after timeout and recovery on presence
-        rules += [{
-            "name": name + "/dim",
-            "recycle": False,
-            "conditions": [
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "eq",
-                    "value": "false"
-                },
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "ddx",
-                    "value": "PT" + desc["timeout"]
-                },
-                {
-                    "address": "/groups/" + groupID + "/state/any_on",
-                    "operator": "eq",
-                    "value": "true"
-                },
-                # dim if the light is on, either through sensor or through light on
-                # this works only after presence, but doesn't timeout on switch with no presence
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                    "operator": "lt",
-                    "value": "2"
-                }
-            ],
-            "actions": [
-                {
-                    "address": "/scenes/" + sceneID,
-                    "method": "PUT",
-                    "body": {
-                        "storelightstate": True
-                    }
-                },
-                {
-                    "address": "/groups/" + groupID + "/action",
-                    "method": "PUT",
-                    "body": {
-                        "bri_inc": -128
-                    }
-                },
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                    "method": "PUT",
-                    "body": {
-                        "status": 2
-                    }
-                }
-            ]
-        },
-        {
-            "name": name + "/recover",
-            "conditions": [
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "eq",
-                    "value": "true"
-                },
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "dx"
-                },
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                    "operator": "eq",
-                    "value": "2"
-                }
-            ],
-            "actions": [
-                {
-                    "address": "/groups/" + groupID + "/action",
-                    "method": "PUT",
-                    "body": {
-                        "scene": sceneID
-                    }
-                },
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                    "method": "PUT",
-                    "body": {
-                        "status": 1
-                    }
-                }
-            ]
-        }]
-        
-        if "contact" in desc:
-            # Add rules to handle door contact. When the door is closed and motion has been
-            # detected after the door is closed, then don't react until door is open
-            # again. If no motion has been detected after door is closed, then turn off light.
-            
-            # The sensor sends a no-presence signal after 10 seconds of no-presence detection.
-            # So check after 11 seconds after closing doors whether there is presence or not.
-            contactName = desc["contact"]
-            # first rule fires if there is someone behind closed door
-            rules.append(
-                {
-                    "name": name + "/clo.on",
-                    "actions" : [
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                            "method": "PUT",
-                            "body": {
-                                "status": 3
-                            }
-                        }
-                    ],
-                    "conditions" : [
-                        {
-                            "address": "/sensors/" + sensorID + "/state/presence",
-                            "operator": "eq",
-                            "value": "true"
-                        },
-                        # fire if any light is on and we are not yet in dimming phase
-                        {
-                            "address": "/groups/" + groupID + "/state/any_on",
-                            "operator": "eq",
-                            "value": "true"
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                            "operator": "lt",
-                            "value": "2"
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                            "operator": "eq",
-                            "value": "1"
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                            "operator": "ddx",
-                            "value": "PT00:00:12"
-                        }
-                    ]
-                }
-            )
-            # second rule fires if there is noone behind closed door
-            actions = [
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                    "method": "PUT",
-                    "body": {
-                        "status": 0
-                    }
-                }
-            ]
-            conditions = [
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "eq",
-                    "value": "false"
-                },
-                # fire if any light is on and we are not yet in dimming phase
-                {
-                    "address": "/groups/" + groupID + "/state/any_on",
-                    "operator": "eq",
-                    "value": "true"
-                },
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                    "operator": "lt",
-                    "value": "2"
-                },
-                {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                    "operator": "eq",
-                    "value": "1"
-                },
-                {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                    "operator": "ddx",
-                    "value": "PT00:00:11"
-                }
-            ]
-            rules += self.__createRulesForAction(binding, name, "clo.off", state, conditions, actions)
-            # opening the door will allow rearming the timeout when the person leaves the room
-            # TODO this relies on motion detection during leaving the room, which should be given.
-            # Can we do better? Probably yes by delegating presence sensor change to state sensor
-            # change, then we can set state sensor here and ddx on state sensor instead of motion
-            # sensor.
-            rules.append(
-                {
-                    "name": name + "/open",
-                    "conditions": [
-                        {
-                            "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                            "operator": "eq",
-                            "value": "0"
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                            "operator": "eq",
-                            "value": "3"
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + contactName + "}/state/status",
-                            "operator": "dx"
-                        }
-                    ],
-                    "actions": [
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                            "method": "PUT",
-                            "body": {
-                                "status": 1
-                            }
-                        }
-                    ]
-                }
-            )
+        # TODO prevent state updates to -1 if we are already in state 3
 
         return rules
                     
