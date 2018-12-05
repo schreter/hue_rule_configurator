@@ -8,8 +8,6 @@ Created on 20 Nov 2018
 import requests
 import json
 import re
-import pprint
-from copy import deepcopy
 
 VAR_PATTERN = re.compile("\\${([^}:]+):([^}]+)}")
 SCENE_PATTERN = re.compile("^([^:]+):(.*)$")
@@ -83,8 +81,11 @@ class HueBridge():
         self.__lights_idx = HueBridge.__make_index(self.__lights, 'lights')
         self.__groups = self.__all["groups"]
         self.__groups_idx = HueBridge.__make_index(self.__groups, 'groups', ['Group for wakeup'])
+        self.__resourcelinks = self.__all["resourcelinks"]
+        self.__resourcelinks_idx = HueBridge.__make_index(self.__resourcelinks, 'resourcelinks')
         self.__scenes = self.__all["scenes"]
         self.__scenes_idx = {}
+        self.__groups_idx["All Lights"] = "0"
         for i in self.__scenes.keys():
             s = self.__scenes[i]
             n = s["name"]
@@ -194,6 +195,7 @@ class HueBridge():
         
     def __createSensor(self, sensorData):
         name = sensorData["name"]
+        sensorData["recycle"] = True
         tmp = requests.post(self.urlbase + "/sensors", json=sensorData)
         if tmp.status_code != 200:
             raise Exception("Cannot create sensor " + name + ": " + tmp.text)
@@ -202,8 +204,10 @@ class HueBridge():
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
         sensorID = result["success"]["id"]
         self.__sensors_idx[name] = sensorID
+        sensorData["owner"] = self.apiKey
         self.__sensors[sensorID] = sensorData
         print("Created sensor", sensorID, name)
+        return sensorID
 
     def __deleteRule(self, ruleID):
         name = self.__rules[ruleID]["name"]
@@ -219,6 +223,7 @@ class HueBridge():
         if name != fullname:
             print("WARNING: Shortening rule name '" + fullname + "' to '" + name + "'")
             ruleData["name"] = name
+        ruleData["recycle"] = True
         tmp = requests.post(self.urlbase + "/rules", json=ruleData)
         if tmp.status_code != 200:
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
@@ -226,8 +231,19 @@ class HueBridge():
         if not "success" in result:
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
         ruleID = result["success"]["id"]
+        ruleData["owner"] = self.apiKey
         self.__rules[ruleID] = ruleData
         print("Created rule", ruleID, name)
+        return ruleID
+
+    def __deleteResourceLink(self, linkID):
+        name = self.__resourcelinks[linkID]["name"]
+        tmp = requests.delete(self.urlbase + "/resourcelinks/" + linkID)
+        if tmp.status_code != 200:
+            raise Exception("Cannot delete resource link " + linkID + "/" + name + ": " + tmp.text)
+        del self.__resourcelinks_idx[name]
+        del self.__resourcelinks[linkID]
+        print("Deleted resource link", linkID, name)
 
     def __ruleForSensorReset(self, v):
         """ Create rule for reset of sensor after timeout """
@@ -244,7 +260,6 @@ class HueBridge():
                 ruleData = {
                     "name": name + " timeout " + str(i + 1),
                     "status": "enabled",
-                    "recycle": False,
                     "conditions": [
                         {
                             "address": "/sensors/${sensor:" + name + "}/state/lastupdated",
@@ -283,7 +298,6 @@ class HueBridge():
             ruleData = {
                 "name": name + '/' + i[0],
                 "status": "enabled",
-                "recycle": False,
                 "conditions": [
                     {
                         "address": "/sensors/${sensor:" + name + "}/state/status",
@@ -376,7 +390,6 @@ class HueBridge():
         return {
             "name": name + "/" + ref + "=" + value,
             "status": "enabled",
-            "recycle": False,
             "conditions": conditions,
             "actions": actions + resetActions
         }
@@ -615,7 +628,6 @@ class HueBridge():
             rule = {
                 "name": name,
                 "status": "enabled",
-                "recycle": False,
                 "conditions": conditions,
                 "actions": actions + lightActions
             }
@@ -639,7 +651,6 @@ class HueBridge():
             rule = {
                 "name": name + " toggle ON",
                 "status": "enabled",
-                "recycle": False,
                 "conditions": conditions + [
                     {
                         "address": "/lights/" + lightID + "/state/on",
@@ -668,7 +679,6 @@ class HueBridge():
             rule = {
                 "name": name + " toggle OFF",
                 "status": "enabled",
-                "recycle": False,
                 "conditions": conditions + [
                     {
                         "address": "/lights/" + lightID + "/state/on",
@@ -880,8 +890,6 @@ class HueBridge():
         # TODO if state parameter provided, reset state of the associated switch when turning lights on/off
         
         rules = []
-        conditions = []        
-        actions = []
         onactions = None
         offactions = None
         for act in bindings.keys():
@@ -896,47 +904,75 @@ class HueBridge():
         # handling for state 0
         
         # rule(1): motion detected in dark and lights off: turn on lights and switch to state 1
-        if onactions:
-            # only create if we have any on-action
-            # TODO need to create also for no on-action to go to state 1
-            conditions = [
-                {
-                    "address": "/sensors/" + sensorID + "/state/presence",
-                    "operator": "eq",
-                    "value": "true"
-                },
-                {
-                    "address": "/sensors/" + lightSensorID + "/state/dark",
-                    "operator": "eq",
-                    "value": "true"
-                },
-                # NOTE: react in any state except blocked by switch (e.g., closed door in state 3 and lights off)
-                {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                    "operator": "gt",
-                    "value": "-1"
-                },
-                {
-                    "address": "/groups/" + groupID + "/state/any_on",
-                    "operator": "eq",
-                    "value": "false"
+        conditions = [
+            {
+                "address": "/sensors/" + sensorID + "/state/presence",
+                "operator": "eq",
+                "value": "true"
+            },
+            {
+                "address": "/sensors/" + lightSensorID + "/state/dark",
+                "operator": "eq",
+                "value": "true"
+            },
+            # NOTE: react in any state except blocked by switch (e.g., closed door in state 3 and lights off)
+            {
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "operator": "gt",
+                "value": "-1"
+            },
+            {
+                "address": "/groups/" + groupID + "/state/any_on",
+                "operator": "eq",
+                "value": "false"
+            }
+        ]
+        actions = [
+            {
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state",
+                "method": "PUT",
+                "body": {
+                    "status": 1
                 }
-            ]
-            actions = [
+            }
+        ]
+        if "state" in state:
+            # reset associated switch sensor state before turning on lights (typically turned on via redirect)
+            actions.append(
                 {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state",
+                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
                     "method": "PUT",
-                    "body": {
-                        "status": 1
-                    }
+                    "body": { "status": 0 }
                 }
-            ]
-            rules += self.__createRulesForAction(onactions, name, "pres.on", state, conditions, actions)
+            )
+        for i in [
+            ["pres.on", {
+                "address": "/sensors/" + sensorID + "/state/presence",
+                "operator": "dx"
+            }],
+            ["dark.on", {
+                "address": "/sensors/" + lightSensorID + "/state/dark",
+                "operator": "dx"
+            }],
+            ["stat.on", {
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "operator": "dx",
+            }]
+        ]:
+            cname = i[0]
+            condition = i[1]
+            if onactions:
+                rules += self.__createRulesForAction(onactions, name, cname, state, conditions + [condition], actions)
+            else:
+                rules.append({
+                    "name": name + "/" + cname,
+                    "conditions": conditions + [condition],
+                    "actions": actions
+                })
         
         # rule(2): motion detected and lights on switches to state 1
         rules.append({
             "name": name + "/motion",
-            "recycle": False,
             "conditions": [
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
@@ -970,7 +1006,6 @@ class HueBridge():
         #          dim lights and enter state 2
         rules.append({
             "name": name + "/dim",
-            "recycle": False,
             "conditions": [
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
@@ -1030,7 +1065,6 @@ class HueBridge():
         #            switch to state 0 (lights still on; rule(2) switches back to state 1 upon motion)
         rules.append({
             "name": name + "/pres.off",
-            "recycle": False,
             "conditions": [
                 {
                     "address": "/sensors/" + sensorID + "/state/presence",
@@ -1082,6 +1116,15 @@ class HueBridge():
                 }
             }
         ]
+        if "state" in state:
+            # reset associated switch sensor state before turning off lights
+            actions.append(
+                {
+                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                    "method": "PUT",
+                    "body": { "status": 0 }
+                }
+            )
         if offactions:
             # explicit off action specified
             if "switchstate" in desc:
@@ -1098,7 +1141,6 @@ class HueBridge():
             # no off action, add default one (group off)
             rules.append({
                 "name": name + "/off",
-                "recycle": False,
                 "conditions": conditions,
                 "actions" : actions + [
                     {
@@ -1277,7 +1319,6 @@ class HueBridge():
                 # no off action, add default one (group off)
                 rules.append({
                     "name": name + "/clo.off",
-                    "recycle": False,
                     "conditions": conditions,
                     "actions" : actions + [
                         {
@@ -1397,7 +1438,7 @@ class HueBridge():
             "name": sceneName,
             "lights": self.__groups[groupID]["lights"], 
             #"group": groupID,
-            "recycle": False
+            "recycle": True
         }
         r = requests.post(self.urlbase + "/scenes", json=body)
         if r.status_code != 200:
@@ -1406,7 +1447,11 @@ class HueBridge():
         res = json.loads(r.text)
         if not "success" in res[0]:
             raise Exception("Cannot create scene '" + sceneName + "', error: " + r.text)
-        self.__scenes_idx[groupID][sceneName] = res[0]["success"]["id"]
+        id = res[0]["success"]["id"]
+        body["owner"] = self.apiKey
+        self.__scenes[id] = body
+        self.__scenes_idx[groupID][sceneName] = id
+        return id
         
     def __updateReferences(self, obj):
         if type(obj) is list:
@@ -1451,8 +1496,7 @@ class HueBridge():
             "modelid": "GenericCLIP",
             "manufacturername": "Philips",
             "swversion": "1.0",
-            "uniqueid": name,
-            "recycle": False
+            "uniqueid": name
         }
         newSensors.append(sensorData)
         newRules += self.__ruleForSensorReset(v)
@@ -1460,14 +1504,20 @@ class HueBridge():
             newRules += self.__rulesForContact(v)
         return [newSensors, newRules, deleteSensorIDs, deleteRuleIDs]
 
-    def configure(self, config):
+    def configure(self, config, name):
         """ Configure the bridge. See README.md for config structure """
+
+        # find resourcelink, if any
+        linkID = None
+        if name in self.__resourcelinks_idx:
+            linkID = self.__resourcelinks_idx[name]
 
         # first collect rules and sensors to delete
         deleteSensorIDs = []
         deleteRuleIDs = []
         newSensors = []
         newRules = []
+        links = []
         for v in config:
             tp = v["type"]
             if tp == "switch":
@@ -1504,7 +1554,8 @@ class HueBridge():
                 groupID = self.__groups_idx[v["group"]]
                 if not sceneName in self.__scenes_idx[groupID]:
                     # create new scene for the group
-                    self.__createScene(groupID, sceneName)
+                    sceneID = self.__createScene(groupID, sceneName)
+                    links.append("/scenes/" + sceneID)
                 newRules += self.__rulesForMotion(sensorID, v)
             else:
                 raise Exception("Unknown configuration type '" + tp + "'")
@@ -1520,13 +1571,16 @@ class HueBridge():
         for i in deleteSensorIDs:
             self.__deleteSensor(i)
         
-        # TODO delete resource
+        if linkID:
+            print("Resource link to delete:", linkID)
+            self.__deleteResourceLink(linkID)
 
         # create any sensors needed to represent switch states
         #print("Sensors to create:")
         #pprint.pprint(newSensors)
         for i in newSensors:
-            self.__createSensor(i)
+            sensorID = self.__createSensor(i)
+            links.append("/sensors/" + sensorID)
 
         # update references in rules
         self.__updateReferences(newRules)
@@ -1535,6 +1589,56 @@ class HueBridge():
         #print("Rules to create:")
         #pprint.pprint(newRules)
         for i in newRules:
-            self.__createRule(i)
+            ruleID = self.__createRule(i)
+            links.append("/rules/" + ruleID)
 
-        # TODO create resource with links to all new rules and sensors
+        # create resource with links to all new rules and sensors
+        resourceData = {
+            "name": name,
+            "description": "Rules generated for: " + name,
+            "type": "Link",
+            "classid": 4711,
+            "recycle": False,
+            "links": links
+        }
+        tmp = requests.post(self.urlbase + "/resourcelinks", json=resourceData)
+        if tmp.status_code != 200:
+            raise Exception("Cannot create resource link " + name + ": " + tmp.text)
+        result = json.loads(tmp.text)[0];
+        if not "success" in result:
+            raise Exception("Cannot create resource link " + name + ": " + tmp.text)
+        print("Created resource link " + name + " with ID " + result["success"]["id"])
+
+    def __printForeign(self, tp, ignoreKey):
+        data = self.__all[tp]
+        print("Foreign " + tp)
+        for key in data.keys():
+            desc = data[key]
+            owner = None
+            if "owner" in desc:
+                owner = desc["owner"][0:32]
+            elif "command" in desc and "address" in desc["command"]:
+                owner = desc["command"]["address"][5:37]
+            else:
+                raise Exception("Cannot find owner of " + desc["name"] + ", id=" + key + ", data=" + str(desc))
+            if owner != self.apiKey[0:32] and owner != ignoreKey[0:32]:
+                print(" -", key, "name=" + desc["name"] + ", owner=" + owner)
+                continue
+            if not desc["recycle"] and tp != "resourcelinks":
+                print(" - NOT RECYCLING", key, "name=" + desc["name"] + ", owner=" + owner)
+
+    def findForeignData(self, ignoreKey):
+        # print all rules, sensors, etc. which don't belong to us
+        self.__printForeign('rules', ignoreKey)
+        self.__printForeign('schedules', ignoreKey)
+        self.__printForeign('resourcelinks', ignoreKey)
+        # check also for empty resource links
+        for key in self.__resourcelinks.keys():
+            desc = self.__resourcelinks[key]
+            if len(desc["links"]) == 0:
+                print(" - empty resource link " + key + " name=" + desc["name"] + "owner=" + desc["owner"])
+                if (desc["owner"][0:32] == self.apiKey[0:32]):
+                    print("   (own empty resource, deleting)")
+                    self.__deleteResourceLink(key)
+
+    # TODO add boot time rule
