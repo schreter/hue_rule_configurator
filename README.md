@@ -35,7 +35,10 @@ State sensor is used to store the state of a switch. One state sensor can be use
 states in parallel (indicated by `uses: 2`), e.g., for cycling through scenes on `on` button
 and cycling between off and nightlight scene on `off` button.
 
-If `timeout` is set, then the state sensor resets to 0 after this timeout (HH:MM:SS).
+If `timeout` is set, then the state sensor resets to 0 after this timeout (HH:MM:SS). Depending
+on use count, this will create one or two rules to reset the state after timeout.
+
+State virtual sensor creates one CLIP sensor.
 
 
 ### Switch sensor
@@ -68,9 +71,12 @@ Following symbolic names are supported:
   `brighter-release`, `darker`, `darker-hold`, `darker-release`, `off`, `off-hold` and
   `off-release` for Philips dimmer buttons
 
-TODO describe sensor parameter for switch and external and implement it to disable sensor for some time.
+Each binding creates by default one rule, except multi-scene and toggle bindings (see later).
 
-### External sensor
+
+### External input
+
+#### Generic external sensor
 
 Example:
 ```python
@@ -108,7 +114,7 @@ This a bit more complicated example shows the usage of external input. It is ver
 configuration, but instead of button IDs we have values which are set from outside. Values 0 and 1 are
 reserved (0 for boot time and 1 for no action).
 
-External input uses CLIP sensor named `ExternalInput`. If such a sensor doesn't exist, it will be created.
+External input uses CLIP state sensor named `ExternalInput`. If such a sensor doesn't exist, it will be created.
 
 Since this particular example uses multi-state buttons, we need a state sensor to store the current
 state of the switch to detect multiple presses. You can see that for input `11`, we have three scenes
@@ -117,8 +123,10 @@ otherwise first scene is used. For input `12`, we have again two scenes. To cycl
 scenes, we again use state sensor, but this time the the secondary state (i.e., negative values).
 More on this in action types.
 
+Same as for switch sensor, each binding creates by default one rule, except multi-scene and toggle
+bindings (see later).
 
-### Contact sensor
+#### Contact sensor
 
 Example:
 ```python
@@ -141,6 +149,24 @@ Contact sensor is extremely useful to disable motion sensor while door is closed
 bathroom motion sensor might have a timeout of 1 minute, but when someone is in the bathroom
 taking a shower, he doesn't want to do it in the dark. The contact sensor can be used to stop
 motion sensor from turning off the light.
+
+Contact sensor creates one CLIP sensor and two rules.
+
+
+#### Where to get external input?
+
+External input can be fed to the Hue Bridge by any external system capable of posting an integer
+value to the CLIP status sensor `ExternalInput` (identified by its ID in the respective PUT request).
+
+The author uses a companion project [enocean_to_hue](https://github.com/schreter/enocean_to_hue) to
+map commands sent by Enocean switches to integer values and send them to the Hue bridge. Refer to
+the documentation of that project for more details.
+
+As hardware, the author uses Eltako FT55R rocker switches and Eltako TF-FKB door/window contact
+to generate events, which are then processed by the aforementioned gateway. The advantage is that
+it's possible to exchange the actual Enocean hardware in those switches with the one in Philips
+Tap buttons, so you can install "reliable" ZigBee inserts into Eltako frames and mount them on
+the wall and install "less reliable" Enocean inserts into left-over Philips Tap enclosures.
 
 
 ### Motion sensor
@@ -179,6 +205,13 @@ during dim time, the light is restored to full light and the timeout starts anew
 Binding for `off` is optional and defaults to turning off the lights. Binding for `on` is also
 optional, if not specified, the lights won't be turned on automatically (just turned off).
 
+Additionally, it's possible to specify bindings for `dim` and `recover`, which are called on
+no motion timeout to dim the lights and to recover light states if motion is detected in the
+dimmed state. They by default dim the light by 50% and recover state before dimming. However,
+this wears off the lamps, so it's better to specify at least `recover` binding, typically to
+the same action as `on` action (this can be shortened by specifying string `"on"` as the
+action). If `recover` action is specified, then `dim` action will not save light state.
+
 If the optional `state` is present, then the sensor with this name will be reset before
 turning light on or off.
 
@@ -187,7 +220,16 @@ parameter. When there is no motion detected shortly after closing the door, the 
 off, else it is kept on until the door is open again (and then normal rules with timeout apply).
 As already mentioned, this is extremely useful for bathroom.
 
-TODO add binding for dimming lights
+If a motion sensor is used with a switch, then turning off the light while motion is detected
+would simply turn the light back on immediately. To prevent this, the motion sensor adds rules
+to explicitly disable itself for some time (default 30 seconds, but it can be overridden using
+parameter `offtimeout`) when the light is turned off manually (by a switch, external action or
+in the app).
+
+Motion sensor creates one CLIP sensor to store sensor state and 8 rules for standard motion handling,
+3 rules for integration with switches to properly handle manually turning light on or off and if
+a door contact is used, then additional 5 rules for handling door contact. I.e., depending on
+the configuration, up to 16 rules are used for a single motion sensor.
 
 
 ## Action types
@@ -240,7 +282,9 @@ Example:
 
 Scene action is the most powerful action available. It allows you to specify list of scenes using
 `configs` parameter and set of time ranges with scene index in optional `times` parameter. In the
-simplest case, there is just a single scene present and no state or times specified.
+simplest case, there is just a single scene present and no state or times specified. For single
+scene, instead of `configs` with a single scene, you can also use parameter `value` which names
+a single scene.
 
 When multiple scenes are specified, the scene to use depends on the state. Typically, the state is
 reset after some timeout, so when the action is repeated (e.g., light switched on), the first scene
@@ -259,6 +303,12 @@ Additional `timeout` parameter can be specified for a configuration of the scene
 after the specified timeout (unless another action was triggered).
 
 NOTE: timeout doesn't work yet.
+
+Scenes create one rule per scene, one rule to start default scene or per time range one
+rule to start default scene for the time range. I.e., the above example would create 5 rules
+for binding 2 and 3 rules for binding 1.
+
+Each timeout to turn off lights in a specified scene after a timeout adds one additional rule.
 
 
 ### Off
@@ -280,6 +330,8 @@ Example:
 Use action type `off` to turn lights of the group off. This is shorthand for
 `{ "type": "scene", "configs": [ {"scene": "off"} ] }`.
 
+Off action creates one rule.
+
 
 ### Light
 
@@ -298,6 +350,8 @@ Light action defines one of the actions for a single light:
 - `on` - turn the light on
 - `off` - turn the light off
 - `toggle` - toggle the state of the light (see example)
+
+On and off actions create one rule, toggle action creates two rules.
 
 
 ### Dim
@@ -340,6 +394,8 @@ explicitly configuring all rules for dimming up and down, simply add `HueBridge.
 to the list of bindings for the dimmer. Then, it's sufficient to configure `on` and `off`
 actions.
 
+Dim action creates one rule.
+
 
 ### Redirect
 
@@ -354,6 +410,8 @@ of several switches in the same way. E.g., if you have two or more switches in t
 they should behave identically, you could configure them identically. But, if one of the buttons
 has a complex action (e.g., multi-scene time-based action), then you can implement this action
 once as `external` with some ID and simply redirect buttons of all switches to the same action.
+
+Redirect action creates one rule.
 
 
 ## Complete Example
@@ -450,9 +508,11 @@ CONFIG_WC = [
 
 if __name__ == '__main__':
     h = HueBridge(BRIDGE, API_KEY)
-    h.configure(CONFIG_LR)
-    h.configure(CONFIG_WC)
+    h.configure(CONFIG_LR, "Livingroom")
+    h.configure(CONFIG_WC, "Bathroom")
 ```
 
 This example shows two independent configurations for living room with multi-state scenes
-and for bathroom with motion sensor.
+and for bathroom with motion sensor. Refer to a complex, documented example in
+[hue_rule_generator.py](hue_rule_generator.py) for further real-world examples with detailed
+explanation in comments.
