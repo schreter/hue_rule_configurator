@@ -32,7 +32,9 @@ CONFIG_LR = [
         "bindings": {
             # Redirect to external actions, so we can use more than one switch
             "tr": { "type": "redirect", "value": "14" },
-            "br": { "type": "redirect", "value": "12" }
+            "br": { "type": "redirect", "value": "12" },
+            # Use one button to turn off kitchen light from the living room (external input 11)
+            "bl": { "type": "redirect", "value": "11" }
         }
     },
     # Actions for external input from an Enocean switch (similar to Philips Tap)
@@ -83,7 +85,7 @@ CONFIG_LR = [
             }
             # We also have external action "11" sent by the switch in the living room.
             # Instead of handling it here, it's moved below to kitchen configuration,
-            # since it's more natural. But, it could be defined here as well. 
+            # since it's more natural. But, it could be defined here as well.
         }
     }
 ]
@@ -108,9 +110,7 @@ CONFIG_KITCHEN = [
                 # On action will be redirected to respective external actions, so we can share
                 # configuration with motion sensor below.
                 "type": "redirect",
-                "value": "29",
-                # When turned on by the switch, deactivate sensor for some time
-                "sensor": "Küche sensor"
+                "value": "29"
             },
             "bl": {
                 # Off action executed inline.
@@ -121,10 +121,7 @@ CONFIG_KITCHEN = [
                 # room light off below would reset the state as well.
                 "state": "Küche state",
                 # Instead of multiple scene configs, we use single scene value here.
-                "value": "off",
-                # When turned off by the switch, deactivate sensor for some time, so the light
-                # won't be turned on immediately afterwards, if motion is still detected.
-                "sensor": "Küche sensor"
+                "value": "off"
             },
             "br": {
                 # A button to turn off the light in living room - redirect to action for living
@@ -307,7 +304,7 @@ CONFIG_HW = [
         "dimtime": "00:00:20",
         "state": "Flur state",
         "bindings": {
-            "on": { "type": "redirect", "value": "112" },
+            "on": { "type": "redirect", "value": "102" },
             "recover": "on"
         }
     },
@@ -319,12 +316,9 @@ CONFIG_HW = [
         "type": "external",
         "name": "Flur",
         "group": "Flur",
-        "sensor": "Flur sensor",
         "bindings": {
-            "102": { "type": "redirect", "value": "112" },  # to use the same action as motion on
-            "103": { "type": "off", "state": "Flur state" },
-            # redirected from switch and motion
-            "112": {
+            # on action redirected from motion sensor above as well
+            "102": {
                 "type": "scene",
                 "state": "Flur state",
                 "configs": [
@@ -336,9 +330,9 @@ CONFIG_HW = [
                     "T23:00:00/T06:00:00": 0,
                     "T06:00:00/T18:00:00": 2,
                     "T18:00:00/T23:00:00": 1,
-                },
-                "sensor": None  # do not disable sensor when called from sensor
-            }
+                }
+            },
+            "103": { "type": "off", "state": "Flur state" }
         }
     },
 
@@ -350,7 +344,7 @@ CONFIG_HW = [
         "dimtime": "00:00:20",
         "state": "Gallerie state",
         "bindings": {
-            "on": { "type": "redirect", "value": "114" },
+            "on": { "type": "redirect", "value": "104" },
             "dim": {
                 # Here we use special dimming method. In case we are dimming during the day,
                 # then just dim as usual by decreasing the brightness by half (-128/256).
@@ -378,12 +372,9 @@ CONFIG_HW = [
         "type": "external",
         "name": "Gallerie",
         "group": "Gallerie",
-        "sensor": "Gallerie sensor",
         "bindings": {
-            "104": { "type": "redirect", "value": "114" },  # to use the same action as motion on
-            "105": { "type": "off", "state": "Gallerie state" },
-            # redirected from switch and motion
-            "114": {
+            # on action redirected from motion sensor above as well
+            "104": {
                 "type": "scene",
                 "state": "Gallerie state",
                 "configs": [
@@ -395,9 +386,9 @@ CONFIG_HW = [
                     "T23:00:00/T06:00:00": 0,
                     "T06:00:00/T20:30:00": 2,
                     "T20:30:00/T23:00:00": 1,
-                },
-                "sensor": None  # do not disable sensor when called from sensor
-            }
+                }
+            },
+            "105": { "type": "off", "state": "Gallerie state" }
         }
     },
 
@@ -409,7 +400,7 @@ CONFIG_HW = [
         "dimtime": "00:00:20",
         "state": "Kellerflur state",
         "bindings": {
-            "on": { "type": "redirect", "value": "116" },
+            "on": { "type": "redirect", "value": "106" },
             "recover": "on"
         }
     },
@@ -421,12 +412,9 @@ CONFIG_HW = [
         "type": "external",
         "name": "Kellerflur",
         "group": "Kellerflur",
-        "sensor": "Kellersensor",
         "bindings": {
-            "106": { "type": "redirect", "value": "116" },  # to use the same action as motion on
-            "107": { "type": "off", "state": "Kellerflur state" },
-            # redirected from switch and motion
-            "116": {
+            # on action redirected from motion sensor above as well
+            "106": {
                 "type": "scene",
                 "state": "Kellerflur state",
                 "configs": [
@@ -436,9 +424,9 @@ CONFIG_HW = [
                 "times": {
                     "T23:00:00/T06:00:00": 0,
                     "T06:00:00/T23:00:00": 1,
-                },
-                "sensor": None  # do not disable sensor when called from sensor
-            }
+                }
+            },
+            "107": { "type": "off", "state": "Kellerflur state" }
         }
     },
     
@@ -450,8 +438,6 @@ CONFIG_HW = [
             "2": {
                 # Special group "All Lights" addresses as the name says all lights.
                 "group": "All Lights",
-                # Since hallway sensor will detect motion, disable it for short time until we leave the house.
-                "sensor": "Flur sensor",
                 "type": "off"
             }
         }
