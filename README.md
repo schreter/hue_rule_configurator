@@ -94,8 +94,8 @@ Example:
                 {"scene": "Other"}
             ],
             "times": {
-                "T07:00:00/T20:00:00": 1,   # day
-                "T20:00:00/T07:00:00": 0    # night
+                "T07:00:00/T20:00:00": 2,   # day
+                "T20:00:00/T07:00:00": 1    # night
             }
         },
         "12": {
@@ -217,8 +217,10 @@ turning light on or off.
 
 Optionally, a contact sensor defined in the same configuration can be addressed using `contact`
 parameter. When there is no motion detected shortly after closing the door, the light is turned
-off, else it is kept on until the door is open again (and then normal rules with timeout apply).
-As already mentioned, this is extremely useful for bathroom.
+off, by default after 16 seconds (use `closedtimeout` to override), by slowly dimming it to off
+state over 20 seconds (use `closedtt` to override, in deciseconds). Else, it is kept on until
+the door is open again (and then normal rules with timeout apply). As already mentioned, this
+is extremely useful for bathrooms.
 
 If a motion sensor is used with a switch, then turning off the light while motion is detected
 would simply turn the light back on immediately. To prevent this, the motion sensor adds rules
@@ -264,8 +266,8 @@ Example:
                 {"scene": "Other"}
             ],
             "times": {
-                "T07:00:00/T20:00:00": 1,   # day
-                "T20:00:00/T07:00:00": 0    # night
+                "T07:00:00/T20:00:00": 2,   # day
+                "T20:00:00/T07:00:00": 1    # night
             }
         },
         "1": {
@@ -296,13 +298,15 @@ should just turn lights off, you can also use action type `off` instead.
 
 If an optional `times` parameter is specified, then instead of starting with the first scene,
 the current time is compared against specified intervals and the scene at the associated index
-is recalled (0-based, i.e., `Night` scene in the above example has index 0). If there is no
+is recalled (1-based, i.e., `Night` scene in the above example has index 1). If there is no
 time range for the current time, then no action is triggered.
 
 Additional `timeout` parameter can be specified for a configuration of the scene to turn off lights
 after the specified timeout (unless another action was triggered).
 
-NOTE: timeout doesn't work yet.
+If a scene is set "from the side" by a different switch, you can explicitly set state using
+`setstate` parameter in the binding, which sets the index of the scene configured by another
+binding using multi-scene action with the same `state` and `group` parameters.
 
 Scenes create one rule per scene, one rule to start default scene or per time range one
 rule to start default scene for the time range. I.e., the above example would create 5 rules
@@ -456,8 +460,8 @@ CONFIG_LR = [
                     {"scene": "Day"}
                 ],
                 "times": {
-                    "T07:00:00/T16:00:00": 3,   # day
-                    "T16:00:00/T07:00:00": 0    # evening
+                    "T07:00:00/T16:00:00": 4,   # day
+                    "T16:00:00/T07:00:00": 1    # evening
                 }
             },
             "12": {

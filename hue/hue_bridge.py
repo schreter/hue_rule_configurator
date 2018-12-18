@@ -40,10 +40,10 @@ BUTTON_MAP = {
     "bl": "17",
     "bottom-right": "18",
     "br": "18",
-    "top-both": "99",
-    "tlr": "99",
-    "bottom-both": "101",
-    "blr": "101"
+    "top-both": "101",
+    "tlr": "101",
+    "bottom-both": "99",
+    "blr": "99"
     }
 
 class HueBridge():
@@ -461,6 +461,21 @@ class HueBridge():
                     "body": { "status": 0 }
                 }
             ]
+        if "setstate" in binding:
+            if not "state" in state:
+                raise Exception("Missing state configuration to be able to set state of the switch via setstate")
+            if multistate:
+                raise Exception("Setting state via setstate is mutually exclusive with multistate scene")
+            idx = binding["setstate"]
+            if secondaryState:
+                idx = -idx
+            resetstateactions = [
+                {
+                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                    "method": "PUT",
+                    "body": { "status": idx }
+                }
+            ]
 
         for config in configs:
             print("Process",name,index,config)
@@ -499,9 +514,10 @@ class HueBridge():
             if "times" in binding:
                 # multiple time-based rules to turn on scenes, get the one for this index
                 times = binding["times"]
-                tidx = 0
+                tidx = 1
                 for timerange in times:
-                    if times[timerange] == index:
+                    # time indices are 1-based, therefore add 1
+                    if times[timerange] == index + 1:
                         stateCond = [
                             {
                                 "address": "/config/localtime",
@@ -1027,7 +1043,7 @@ class HueBridge():
             # ddx on last update of state sensor instead of presence sensor to turn off
             # also after switching light on w/o movement
             {
-                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
                 "operator": "ddx",
                 "value": "PT" + desc["timeout"]
             },
@@ -1117,7 +1133,7 @@ class HueBridge():
             dimtime = "PT" + desc["dimtime"]
         conditions = [
             {
-                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
                 "operator": "ddx",
                 "value": dimtime
             },
@@ -1421,6 +1437,12 @@ class HueBridge():
 
             # rule(14): check after a 16s timeout:
             #    if no motion is detected and state is still 3 turn lights off and keep state 3
+            closedtimeout = "PT00:00:16"
+            if "closedtimeout" in desc:
+                closedtimeout = desc["closedtimeout"]
+            closedtt = 200  # 20 seconds to dark
+            if "closedtt" in desc:
+                closedtt = desc["closedtt"]
             actions = []
             conditions = [
                 {
@@ -1439,9 +1461,9 @@ class HueBridge():
                     "value": "1"
                 },
                 {
-                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
                     "operator": "ddx",
-                    "value": "PT00:00:16"
+                    "value": closedtimeout
                 }
             ]
             if "state" in state:
@@ -1466,7 +1488,8 @@ class HueBridge():
                             "address": "/groups/" + groupID + "/action",
                             "method": "PUT",
                             "body": {
-                                "on": False
+                                "on": False,
+                                "transitiontime": closedtt
                             }
                         },
                     ]
@@ -1616,6 +1639,47 @@ class HueBridge():
             newRules += self.__rulesForContact(v)
         return [newSensors, newRules, deleteSensorIDs, deleteRuleIDs]
 
+    def __rulesForBoot(self):
+        """ Create boot rule to turn off all lights after reboot """
+        # TODO this doesn't yet work correctly
+        return [{
+            "name": "Boot",
+            "conditions": [
+                # When the bridge reboots, it doesn't know about light states. Ultimately, it will
+                # learn some lights are on, so the any_on on group 0 will be set. We'll react on it.
+                #{
+                #    "address": "/groups/0/state/any_on",
+                #    "operator": "dx"
+                #},
+                #{
+                #    "address": "/groups/0/state/any_on",
+                #    "operator": "eq",
+                #    "value": "true"
+                #},
+                # When the bridge starts, all sensors (including external input) are initialized to 0.
+                # So check for it here.
+                {
+                    "address": "/sensors/" + self.__extinput + "/state/status",
+                    "operator": "eq",
+                    "value": "0"
+                }
+            ],
+            "actions": [
+                # Turn off the light, if any light is on.
+                {
+                    "address": "/groups/0/action",
+                    "method": "PUT",
+                    "body": { "on": False }
+                },
+                # Set status to 1, so we won't react next time.
+                {
+                    "address": "/sensors/" + self.__extinput + "/state",
+                    "method": "PUT",
+                    "body": { "status": 1 }
+                }
+            ]
+        }]
+
     def configure(self, config, name):
         """ Configure the bridge. See README.md for config structure """
 
@@ -1669,6 +1733,8 @@ class HueBridge():
                     sceneID = self.__createScene(groupID, sceneName)
                     links.append("/scenes/" + sceneID)
                 newRules += self.__rulesForMotion(sensorID, v)
+            elif tp == "boot":
+                newRules += self.__rulesForBoot()
             else:
                 raise Exception("Unknown configuration type '" + tp + "'")
 
@@ -1763,6 +1829,23 @@ class HueBridge():
             desc = self.__resourcelinks[key]
             if desc["owner"][0:32] == self.apiKey[0:32]:
                 print(" - " + key + ": " + desc["name"])
+
+    def listAll(self):
+        # list all resorces
+        print("Lights:")
+        for i in self.__lights.keys():
+            light = self.__lights[i]
+            print("  - " + i + ": " + light["name"])
+
+        print("Sensors:")
+        for i in self.__sensors.keys():
+            sensor = self.__sensors[i]
+            print("  - " + i + ": " + sensor["name"] + " (" + sensor["type"] + ")")
+
+        print("Rules:")
+        for i in self.__rules.keys():
+            rule = self.__rules[i]
+            print("  - " + i + ": " + rule["name"])
 
     # TODO add boot time rule
     # TODO check all external inputs for non-overlapping

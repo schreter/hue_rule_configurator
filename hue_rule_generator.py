@@ -25,7 +25,7 @@ CONFIG_LR = [
         # many reset rules to create.
         "uses": 2
     },
-    # Philips Tap switch (build into Eltako frame on the wall)
+    # Philips Tap switch (built into Eltako frame on the wall)
     {
         "type": "switch",
         "name": "Wohnzimmer switch",
@@ -34,7 +34,17 @@ CONFIG_LR = [
             "tr": { "type": "redirect", "value": "14" },
             "br": { "type": "redirect", "value": "12" },
             # Use one button to turn off kitchen light from the living room (external input 11)
-            "bl": { "type": "redirect", "value": "11" }
+            "bl": { "type": "redirect", "value": "11" },
+            # Use both top buttons together to directly switch to bright scene
+            "tlr": {
+                "type": "scene",
+                "group": "Wohnzimmer",
+                "value": "Bright",
+                # Since we are changing the scene "from the side", explicitly set state to
+                # the given value (index of scene in binding 14 below)
+                "state": "Wohnzimmer state",
+                "setstate": 4
+            }
         }
     },
     # Actions for external input from an Enocean switch (similar to Philips Tap)
@@ -62,10 +72,10 @@ CONFIG_LR = [
                     {"scene": "Vitrine"}
                 ],
                 # Default scenes for first on button click depending on time of day
-                # Indices indicate 0-based index of the scene above in configs.
+                # Indices indicate 1-based index of the scene above in configs.
                 "times": {
-                    "T07:00:00/T16:00:00": 4,   # during the day
-                    "T16:00:00/T07:00:00": 0    # evening/night
+                    "T07:00:00/T16:00:00": 5,   # during the day
+                    "T16:00:00/T07:00:00": 1    # evening/night
                 }
             },
             # Actions for switch off button
@@ -82,7 +92,14 @@ CONFIG_LR = [
                         "timeout": "00:20:00"   # switch light off after 20 minutes
                     }
                 ]
+            },
+            # Action for button 3, now at Christmas time to toggle light on the Christmas tree... :-)
+            "13": {
+                "type": "light",
+                "light": "Stromček",
+                "action": "toggle"
             }
+
             # We also have external action "11" sent by the switch in the living room.
             # Instead of handling it here, it's moved below to kitchen configuration,
             # since it's more natural. But, it could be defined here as well.
@@ -123,6 +140,12 @@ CONFIG_KITCHEN = [
                 # Instead of multiple scene configs, we use single scene value here.
                 "value": "off"
             },
+            "tr": {
+                # A button to turn on the light in living room - redirect to action for living
+                # room defined above.
+                "type": "redirect",
+                "value": "14",
+            },
             "br": {
                 # A button to turn off the light in living room - redirect to action for living
                 # room defined above.
@@ -158,9 +181,9 @@ CONFIG_KITCHEN = [
                     {"scene": "Abend"}
                 ],
                 "times": {
-                    "T06:00:00/T18:00:00": 1,
-                    "T18:00:00/T21:30:00": 0,
-                    "T21:30:00/T06:00:00": 2
+                    "T06:00:00/T18:00:00": 2,
+                    "T18:00:00/T21:30:00": 1,
+                    "T21:30:00/T06:00:00": 3
                 }
             },
             # Extra action for one of buttons in the living room to turn off light in the kitchen
@@ -213,8 +236,8 @@ CONFIG_AZ = [
                     {"scene": "Concentrate"}
                 ],
                 "times": {
-                    "T06:00:00/T23:00:00": 1,
-                    "T23:00:00/T06:00:00": 0
+                    "T06:00:00/T23:00:00": 2,
+                    "T23:00:00/T06:00:00": 1
                 }
             },
             "34": {
@@ -278,8 +301,8 @@ CONFIG_WC = [
                     { "scene": "Bright"}
                 ],
                 "times": {
-                    "T06:00:00/T23:00:00": 0,
-                    "T23:00:00/T06:00:00": 1
+                    "T06:00:00/T23:00:00": 1,
+                    "T23:00:00/T06:00:00": 2
                 }
             },
             "109": { "type": "off" }
@@ -327,9 +350,9 @@ CONFIG_HW = [
                     {"scene": "Day"}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 0,
-                    "T06:00:00/T18:00:00": 2,
-                    "T18:00:00/T23:00:00": 1,
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T18:00:00": 3,
+                    "T18:00:00/T23:00:00": 2,
                 }
             },
             "103": { "type": "off", "state": "Flur state" }
@@ -357,8 +380,8 @@ CONFIG_HW = [
                     {"scene": "dim", "value": -128}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 0,
-                    "T06:00:00/T23:00:00": 1
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T23:00:00": 2
                 }
             },
             "recover": "on"
@@ -383,9 +406,9 @@ CONFIG_HW = [
                     {"scene": "Day"}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 0,
-                    "T06:00:00/T20:30:00": 2,
-                    "T20:30:00/T23:00:00": 1,
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T20:30:00": 3,
+                    "T20:30:00/T23:00:00": 2
                 }
             },
             "105": { "type": "off", "state": "Gallerie state" }
@@ -422,8 +445,8 @@ CONFIG_HW = [
                     {"scene": "Day"}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 0,
-                    "T06:00:00/T23:00:00": 1,
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T23:00:00": 2
                 }
             },
             "107": { "type": "off", "state": "Kellerflur state" }
@@ -495,8 +518,8 @@ CONFIG_KIND1 = [
                     {"scene": "Bunt"}
                 ],
                 "times": {
-                    "T06:00:00/T20:00:00": 0,
-                    "T20:00:00/T06:00:00": 1
+                    "T06:00:00/T20:00:00": 1,
+                    "T20:00:00/T06:00:00": 2
                 }
             },
             "52": {
@@ -550,8 +573,8 @@ CONFIG_KIND2 = [
                     {"scene": "Bunt"}
                 ],
                 "times": {
-                    "T06:00:00/T20:00:00": 0,
-                    "T20:00:00/T06:00:00": 1
+                    "T06:00:00/T20:00:00": 1,
+                    "T20:00:00/T06:00:00": 2
                 }
             },
             "41": {
@@ -623,8 +646,8 @@ CONFIG_B = [
                     {"scene": "Read"}
                 ],
                 "times": {
-                    "T06:00:00/T20:00:00": 0,
-                    "T20:00:00/T06:00:00": 2
+                    "T06:00:00/T20:00:00": 1,
+                    "T20:00:00/T06:00:00": 3
                 }
             },
             "62": {
@@ -655,6 +678,9 @@ CONFIG_HWR = [
     }
 ]
 
+# Boot rule configuration to turn off lights on boot
+CONFIG_BOOT = [ { "type": "boot" } ]
+
 if __name__ == '__main__':
     # load the bridge and key configuration from settings.json
     config = {}
@@ -673,7 +699,9 @@ if __name__ == '__main__':
     h.configure(CONFIG_KIND2, "Katarina")
     h.configure(CONFIG_B, "Schlafzimmer")
     h.configure(CONFIG_HWR, "HWR")
-    
+    #h.configure(CONFIG_BOOT, "Boot")    # not yet working correctly
+
     # refresh configuration from the bridge and report any foreign rules
     h.refresh()
     h.findForeignData(config["otherKeys"])
+    #h.listAll()
