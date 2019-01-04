@@ -706,7 +706,7 @@ class HueBridge():
                     raise Exception("Support for time-based multistate timeout w/o state variable not implemented, add state variable to '" + name + "'")
 
                 rule = {
-                    "name": name + "/TO" + str(index),
+                    "name": cname + "/TO" + str(index),
                     "conditions": stateCond + [{
                             "address": "/groups/" + groupID + "/state/any_on",
                             "operator": "eq",
@@ -743,7 +743,7 @@ class HueBridge():
             ]
 
             rule = {
-                "name": name,
+                "name": name + "/" + ref + "/" + action,
                 "status": "enabled",
                 "conditions": conditions,
                 "actions": actions + lightActions
@@ -758,7 +758,7 @@ class HueBridge():
                 }
             ]
             rule = {
-                "name": name + " toggle ON",
+                "name": name + "/" + ref + "/on",
                 "status": "enabled",
                 "conditions": conditions + [
                     {
@@ -778,7 +778,7 @@ class HueBridge():
                 }
             ]
             rule = {
-                "name": name + " toggle OFF",
+                "name": name + "/" + ref + "/off",
                 "status": "enabled",
                 "conditions": conditions + [
                     {
@@ -819,6 +819,16 @@ class HueBridge():
         self.__rulesToCreate.append(rule)
 
     def __createRulesForAction(self, binding, name, ref, state, conditions = [], actions = []):
+        if type(binding) == list:
+            # create rule for each action
+            for item in binding:
+                self.__createRulesForAction(item, name, ref, state, conditions, actions)
+            # NOTE: This can be optimized, since conditions are typically the same, just actions need to be concatenated.
+            # For example, it would be possible to see which rules were added, group them by same conditions
+            # and concatenate their actions. Or to refactor called methods to return actions only (except for
+            # multi-rule actions).
+            return
+
         state = self.__parseCommon(binding, state)
         tp = binding["type"]
         resetstateactions = []

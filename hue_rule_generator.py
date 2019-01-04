@@ -79,21 +79,30 @@ CONFIG_LR = [
                 }
             },
             # Actions for switch off button
-            "12": {
-                # State to use for cycling scenes
-                "state": "Wohnzimmer state",
-                # use negative states in the same state sensor for cycling scenes
-                "stateUse": "secondary",        
-                "type": "scene",
-                "configs": [
-                    {"scene": "off"},
-                    {
-                        "scene": "Nacht", 
-                        "timeout": "00:20:00"   # switch light off after 20 minutes
-                    }
-                ]
-            },
-            # Action for button 3, now at Christmas time to toggle light on the Christmas tree... :-)
+            "12": [
+                # Note list of bindings to associate more than one action
+                {
+                    # State to use for cycling scenes
+                    "state": "Wohnzimmer state",
+                    # use negative states in the same state sensor for cycling scenes
+                    "stateUse": "secondary",
+                    "type": "scene",
+                    "configs": [
+                        {"scene": "off"},
+                        {
+                            "scene": "Nacht",
+                            "timeout": "00:20:00"   # switch light off after 20 minutes
+                        }
+                    ]
+                },
+                # Second action, now at Christmas time to turn off light on the Christmas tree... :-)
+                {
+                    "type": "light",
+                    "light": "Stromček",
+                    "action": "off"
+                }
+            ],
+            # Action for button 3, toggle light on the Christmas tree
             "13": {
                 "type": "light",
                 "light": "Stromček",

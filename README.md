@@ -243,6 +243,9 @@ For each binding, there must be an action specified. Currently, following action
 - `dim` - dim up or down a group
 - `redirect` - redirect to another action by setting value of `ExternalInput` sensor
 
+Note that it is also possible to specify a list of actions for a binding to execute multiple
+actions for a single binding (e.g., turn off light in multiple rooms and the like).
+
 ### Scene
 
 Example:
