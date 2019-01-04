@@ -662,6 +662,100 @@ CONFIG_B = [
     }
 ]
 
+# Configuration for the bathroom
+CONFIG_BAD = [
+    # Switch state for cycling scenes.
+    {
+        "type": "state",
+        "name": "Badezimmer state",
+        "uses": 2
+    },
+    # Primary switch (Philips Tap)
+    {
+        "type": "switch",
+        "name": "Badezimmer switch",
+        "group": "Badezimmer",
+        "bindings": {
+            "tl": { "type": "redirect", "value": "65" },
+            "bl": { "type": "redirect", "value": "66" },
+            "tr": { "type": "light", "light": "Badezimmer Spiegel", "action": "toggle" },
+            "br": { "type": "light", "light": "Badezimmer Spiegel", "action": "off" },
+            "tlr": {
+                "type": "scene",
+                "group": "Badezimmer",
+                "value": "Bright",
+                # Since we are changing the scene "from the side", explicitly set state to
+                # the given value (index of scene in binding 14 below)
+                "state": "Badezimmer state",
+                "setstate": 1
+            }
+        }
+    },
+    # Contact sensor (external one), to detect whether the door is open or closed.
+    {
+        "type": "contact",
+        "name": "Badezimmer contact",
+        "bindings": {
+            "open": "1010",
+            "closed": "1011"
+        }
+    },
+    # Motion sensor to turn light on automatically.
+    {
+        "type": "motion",
+        "name": "Badezimmer sensor",
+        "group": "Badezimmer",
+        # Unfortunately, problems with receipt of EnOcean door switch sensor, so for now high timeouts to work as without the contact switch
+        "timeout": "00:30:00",
+        "dimtime": "00:02:00",
+        "state": "Badezimmer state",
+        # Cooperate with the contact to prevent turning lights on when door is closed and
+        # someone is inside (and for instance taking a shower behind glass door, so the
+        # sensor doesn't "see" the motion). Similarly, if there is no motion whatsoever after
+        # closing the door, turn lights off shortly after.
+        "contact": "Badezimmer contact",
+        "bindings": {
+            # Again, redirect via external input to have common code for switch and motion sensor.
+            "on": { "type": "redirect", "value": "65" },
+            "recover": "on"
+        }
+    },
+    # on/off actions redirected from primary switch and motion sensor.
+    {
+        "type": "external",
+        "name": "Badezimmer",
+        "group": "Badezimmer",
+        "state": "Badezimmer state",
+        "bindings": {
+            "65": {
+                "type": "scene",
+                "group": "Badezimmer oben",
+                "configs": [
+                    {"scene": "Day"},
+                    {"scene": "Evening"},
+                    {"scene": "Nightlight"},
+                    {"scene": "Evening"}
+                ],
+                "times": {
+                    "T21:00:00/T00:00:00": 4,
+                    "T00:00:00/T06:00:00": 3,
+                    "T06:00:00/T07:00:00": 4,
+                    "T07:00:00/T21:00:00": 1
+                }
+            },
+            "66": {
+                "type": "scene",
+                "group": "Badezimmer",
+                "stateUse": "secondary",
+                "configs": [
+                    {"scene": "off"},
+                    {"scene": "Nightlight", "timeout": "00:10:00"}
+                ]
+            }
+        }
+    }
+]
+
 # Configuration for utility room
 CONFIG_HWR = [
     # Only one motion sensor in this room to turn light on/off
@@ -675,6 +769,18 @@ CONFIG_HWR = [
             "on": { "type": "scene", "value": "Bright" },
             "recover": "on"
         }
+    }
+]
+
+# Test config for wake up (not yet working correctly)
+CONFIG_TEST = [
+    {
+        "type": "wakeup",
+        "name": "Test",
+        "group": "WC Wakeup",
+        "start": "W124/T06:20:00",
+        "duration": 10, # minutes
+        "offtime": 60  # minutes since wakeup done
     }
 ]
 
@@ -698,10 +804,12 @@ if __name__ == '__main__':
     h.configure(CONFIG_KIND1, "Julia")
     h.configure(CONFIG_KIND2, "Katarina")
     h.configure(CONFIG_B, "Schlafzimmer")
+    h.configure(CONFIG_BAD, "Badezimmer")
     h.configure(CONFIG_HWR, "HWR")
+    #h.configure(CONFIG_TEST, "Test")    # not yet working correctly
     #h.configure(CONFIG_BOOT, "Boot")    # not yet working correctly
 
     # refresh configuration from the bridge and report any foreign rules
-    h.refresh()
-    h.findForeignData(config["otherKeys"])
+    #h.refresh()
+    #h.findForeignData(config["otherKeys"])
     #h.listAll()
