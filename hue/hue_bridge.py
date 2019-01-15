@@ -1621,17 +1621,33 @@ class HueBridge():
                     ]
                 })
 
-                # rule(15): motion detected and lights off, door closed previously with light on: turn on lights
+            # rule(15a,b): motion detected and lights off, door closed previously with light on: turn on lights
+            actions = []
+            if "state" in state:
+                # reset associated switch sensor state before turning on lights (typically turned on via redirect)
+                actions.append(
+                    {
+                        "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                        "method": "PUT",
+                        "body": { "status": 0 }
+                    }
+                )
+            for cond in [
+                    [{
+                        "address": "/sensors/" + sensorID + "/state/presence",
+                        "operator": "dx"
+                    }, '1'],
+                    [{
+                        "address": "/groups/" + groupID + "/state/any_on",
+                        "operator": "dx"
+                    }, '2']
+                ]:
                 conditions = [
                     {
                         "address": "/sensors/" + sensorID + "/state/presence",
                         "operator": "eq",
                         "value": "true"
                     },
-                    #{
-                    #    "address": "/sensors/" + sensorID + "/state/presence",
-                    #    "operator": "dx",
-                    #},
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
                         "operator": "eq",
@@ -1641,20 +1657,11 @@ class HueBridge():
                         "address": "/groups/" + groupID + "/state/any_on",
                         "operator": "eq",
                         "value": "false"
-                    }
+                    },
+                    cond[0]
                 ]
-                actions = []
-                if "state" in state:
-                    # reset associated switch sensor state before turning on lights (typically turned on via redirect)
-                    actions.append(
-                        {
-                            "address": "/sensors/${sensor:" + state["state"] + "}/state",
-                            "method": "PUT",
-                            "body": { "status": 0 }
-                        }
-                    )
                 if onactions:
-                    self.__createRulesForAction(onactions, name, "clo.on", state, conditions, actions)
+                    self.__createRulesForAction(onactions, name, "clo.on" + cond[1], state, conditions, actions)
                 else:
                     self.__rulesToCreate.append({
                         "name": name + "/clo.on",
