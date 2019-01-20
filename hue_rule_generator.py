@@ -600,18 +600,18 @@ CONFIG_KIND2 = [
 
 # Configuration for the bedroom
 CONFIG_B = [
-    # Planned primary switch (Philips Tap)
-    #{
-    #    "type": "switch",
-    #    "name": "Schlafzimmer switch",
-    #    "group": "Schlafzimmer",
-    #    "bindings": {
-    #        "tl": { "type": "redirect", "value": "61" },
-    #        "bl": { "type": "redirect", "value": "62" },
-    #        "tr": { "type": "dim", "value": 50, "tt": 5 },
-    #        "br": { "type": "dim", "value": -50, "tt": 5 }
-    #    }
-    #},
+    # Primary switch (Philips Tap)
+    {
+        "type": "switch",
+        "name": "Schlafzimmer switch",
+        "group": "Schlafzimmer",
+        "bindings": {
+            "tr": { "type": "redirect", "value": "61" },
+            "br": { "type": "redirect", "value": "62" },
+            "tl": { "type": "dim", "value": 50, "tt": 5 },
+            "bl": { "type": "dim", "value": -50, "tt": 5 }
+        }
+    },
     # Secondary switch (Philips Dimmer)
     {
         "type": "switch",
@@ -649,14 +649,16 @@ CONFIG_B = [
             "61": {
                 "type": "scene",
                 "configs": [
-                    {"scene": "Bright"},
                     {"scene": "Concentrate"},
+                    {"scene": "Bright"},
+                    {"scene": "Evening"},
                     {"scene": "Relax"},
                     {"scene": "Read"}
                 ],
                 "times": {
                     "T06:00:00/T20:00:00": 1,
-                    "T20:00:00/T06:00:00": 3
+                    "T20:00:00/T22:00:00": 3,
+                    "T22:00:00/T06:00:00": 4
                 }
             },
             "62": {
