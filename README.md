@@ -228,10 +228,10 @@ to explicitly disable itself for some time (default 30 seconds, but it can be ov
 parameter `offtimeout`) when the light is turned off manually (by a switch, external action or
 in the app).
 
-Motion sensor creates one CLIP sensor to store sensor state and 8 rules for standard motion handling,
+Motion sensor creates one CLIP sensor to store sensor state and 6 rules for standard motion handling,
 3 rules for integration with switches to properly handle manually turning light on or off and if
-a door contact is used, then additional 6 rules for handling door contact. I.e., depending on
-the configuration, up to 17 rules are used for a single motion sensor.
+a door contact is used, then additional 4 rules for handling door contact. I.e., depending on
+the configuration, up to 13 rules are used for a single motion sensor.
 
 
 ## Action types
