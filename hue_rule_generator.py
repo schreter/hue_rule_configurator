@@ -23,7 +23,11 @@ CONFIG_LR = [
         # We have two different cycles - one for on and one for off button, so 2 uses.
         # This is not strictly needed, only if state timeout is used, it indicates how
         # many reset rules to create.
-        "uses": 2
+        "uses": 2,
+        # reset the state after small timeout, but only if lights are off
+        "timeout": "00:00:10@off",
+        # group is necessary to tell it which lights to check
+        "group": "Wohnzimmer"
     },
     # Philips Tap switch (built into Eltako frame on the wall)
     {
@@ -509,7 +513,9 @@ CONFIG_KIND1 = [
     {
         "type": "state",
         "name": "Julia state",
-        "uses": 2
+        "uses": 2,
+        "timeout": "00:00:10@off",
+        "group": "Julia"
     },
     # Actual actions for on/off
     {
@@ -564,7 +570,9 @@ CONFIG_KIND2 = [
     {
         "type": "state",
         "name": "Katarina state",
-        "uses": 2
+        "uses": 2,
+        "timeout": "00:00:10@off",
+        "group": "Katarina"
     },
     {
         "type": "external",
@@ -637,7 +645,9 @@ CONFIG_B = [
     {
         "type": "state",
         "name": "Schlafzimmer state",
-        "uses": 2
+        "uses": 2,
+        "timeout": "00:00:10@off",
+        "group": "Schlafzimmer"
     },
     # on/off actions redirected from primary, secondary and tertiary switch
     {
@@ -679,7 +689,9 @@ CONFIG_BAD = [
     {
         "type": "state",
         "name": "Badezimmer state",
-        "uses": 2
+        "uses": 2,
+        "timeout": "00:00:10@off",
+        "group": "Badezimmer"
     },
     # Primary switch (Philips Tap)
     {

@@ -361,6 +361,19 @@ class HueBridge():
                 if usecount != 1 and usecount != 2:
                     raise Exception("Use count must be 1 or 2 for " + name)
             rules = []
+            conditions = []
+            if timeout.endswith("@off"):
+                timeout = timeout[:-4]
+                if not "group" in v:
+                    raise Exception("Missing group parameter for @off timeout")
+                groupID = self.__groups_idx[v["group"]]
+                conditions = [
+                    {
+                        "address": "/groups/" + groupID + "/state/any_on",
+                        "operator": "eq",
+                        "value": "false"
+                    }
+                ]
             for i in range(0, usecount):
                 ruleData = {
                     "name": name + " timeout " + str(i + 1),
@@ -376,7 +389,7 @@ class HueBridge():
                             "operator": "lt" if i == 1 else "gt",
                             "value": "0"
                         }
-                    ],
+                    ] + conditions,
                     "actions": [
                         {
                             "address": "/sensors/${sensor:" + name + "}/state",

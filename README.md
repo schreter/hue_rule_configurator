@@ -27,7 +27,8 @@ Example:
     "type": "state",
     "name": "My state",
     "uses": 2,
-    "timeout": "00:00:10"
+    "timeout": "00:00:10@off",
+    "group": "My group"	# only needed for @off timeout
 }
 ```
 
@@ -36,7 +37,19 @@ states in parallel (indicated by `uses: 2`), e.g., for cycling through scenes on
 and cycling between off and nightlight scene on `off` button.
 
 If `timeout` is set, then the state sensor resets to 0 after this timeout (HH:MM:SS). Depending
-on use count, this will create one or two rules to reset the state after timeout.
+on use count, this will create one or two rules to reset the state after timeout. The timeout
+may be suffixed with '@off' to only reset the sensor if no lights are on. In that case, a check
+will be done whether any light is on in the group and the sensor will be reset only in case no
+light is on. This is typically the desired behavior (cycle scenes until switched off).
+
+Why use a timeout? Normally, when just using scene cycling, it is not important, since switching
+off will reset the sensor. But, if you have other special actions, like wake up timer, imagine
+switching off the light in the evening (which primes the switch for nightlight for the next
+"off" press), then being woken up in the morning. When you now switch off the light, it will
+actually turn on nightlight, since the switch is primed for it from the evening before. This
+can be counter-acted by setting a timeout, which is only active when the light is off. Thus,
+to set a night light, you turn off the lights, then press off button once again, which will
+activate the night light.
 
 State virtual sensor creates one CLIP sensor.
 
