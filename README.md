@@ -230,10 +230,12 @@ turning light on or off.
 
 Optionally, a contact sensor defined in the same configuration can be addressed using `contact`
 parameter. When there is no motion detected shortly after closing the door, the light is turned
-off, by default after 16 seconds (use `closedtimeout` to override), by slowly dimming it to off
-state over 20 seconds (use `closedtt` to override, in deciseconds). Else, it is kept on until
-the door is open again (and then normal rules with timeout apply). As already mentioned, this
-is extremely useful for bathrooms.
+off, by default after 16 seconds (use `closedtimeout` to override), by first dimming and then
+turning it to off, similar to normal timeout handling. Else, it is kept on until the door is
+open again (and then normal rules with timeout apply). In case there is no motion detected
+initially by mistake (due to reaction time of non-motion detection) and the light dims, motion
+in the room will restore the light and won't dim it again until the door is open. As already
+mentioned, in sum, this behavior is extremely useful for bathrooms.
 
 If a motion sensor is used with a switch, then turning off the light while motion is detected
 would simply turn the light back on immediately. To prevent this, the motion sensor adds rules
@@ -243,8 +245,8 @@ in the app).
 
 Motion sensor creates one CLIP sensor to store sensor state and 6 rules for standard motion handling,
 3 rules for integration with switches to properly handle manually turning light on or off and if
-a door contact is used, then additional 4 rules for handling door contact. I.e., depending on
-the configuration, up to 13 rules are used for a single motion sensor.
+a door contact is used, then additional 5 rules for handling door contact. I.e., depending on
+the configuration, up to 14 rules are used for a single motion sensor.
 
 
 ## Action types
