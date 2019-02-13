@@ -357,12 +357,6 @@ class HueBridge():
         if "timeout" in v:
             timeout = v["timeout"]
             name = v["name"]
-            usecount = 1
-            if "uses" in v:
-                usecount = v["uses"]
-                if usecount != 1 and usecount != 2:
-                    raise Exception("Use count must be 1 or 2 for " + name)
-            rules = []
             conditions = []
             if timeout.endswith("@off"):
                 timeout = timeout[:-4]
@@ -376,34 +370,27 @@ class HueBridge():
                         "value": "false"
                     }
                 ]
-            for i in range(0, usecount):
-                ruleData = {
-                    "name": name + " timeout " + str(i + 1),
-                    "status": "enabled",
-                    "conditions": [
-                        {
-                            "address": "/sensors/${sensor:" + name + "}/state/lastupdated",
-                            "operator": "ddx",
-                            "value": "PT" + timeout
-                        },
-                        {
-                            "address": "/sensors/${sensor:" + name + "}/state/status",
-                            "operator": "lt" if i == 1 else "gt",
-                            "value": "0"
+            ruleData = {
+                "name": name + "/timeout",
+                "status": "enabled",
+                "conditions": [
+                    {
+                        "address": "/sensors/${sensor:" + name + "}/state/status",
+                        "operator": "ddx",
+                        "value": "PT" + timeout
+                    }
+                ] + conditions,
+                "actions": [
+                    {
+                        "address": "/sensors/${sensor:" + name + "}/state",
+                        "method": "PUT",
+                        "body": {
+                            "status": 0
                         }
-                    ] + conditions,
-                    "actions": [
-                        {
-                            "address": "/sensors/${sensor:" + name + "}/state",
-                            "method": "PUT",
-                            "body": {
-                                "status": 0
-                            }
-                        }
-                    ]
-                }
-                rules.append(ruleData)
-            self.__rulesToCreate += rules
+                    }
+                ]
+            }
+            self.__rulesToCreate.append(ruleData)
 
     def __rulesForContact(self, v):
         """ Create rules for contact sensor """

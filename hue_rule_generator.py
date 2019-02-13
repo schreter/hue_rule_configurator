@@ -20,10 +20,6 @@ CONFIG_LR = [
     {
         "type": "state",
         "name": "Wohnzimmer state",
-        # We have two different cycles - one for on and one for off button, so 2 uses.
-        # This is not strictly needed, only if state timeout is used, it indicates how
-        # many reset rules to create.
-        "uses": 2,
         # reset the state after small timeout, but only if lights are off
         "timeout": "00:00:10@off",
         # group is necessary to tell it which lights to check
@@ -126,10 +122,6 @@ CONFIG_KITCHEN = [
     {
         "type": "state",
         "name": "Küche state"
-        # We have only one cycle for on button.
-        # This is not needed, since single-cycle is default. Also, if state timeout is
-        # not used, no reset rules are created, so it's also not needed.
-        #"uses": 1
     },
     # Philips Tap switch built into Eltako frame on the wall.
     {
@@ -513,7 +505,6 @@ CONFIG_KIND1 = [
     {
         "type": "state",
         "name": "Julia state",
-        "uses": 2,
         "timeout": "00:00:10@off",
         "group": "Julia"
     },
@@ -570,7 +561,6 @@ CONFIG_KIND2 = [
     {
         "type": "state",
         "name": "Katarina state",
-        "uses": 2,
         "timeout": "00:00:10@off",
         "group": "Katarina"
     },
@@ -645,7 +635,6 @@ CONFIG_B = [
     {
         "type": "state",
         "name": "Schlafzimmer state",
-        "uses": 2,
         "timeout": "00:00:10@off",
         "group": "Schlafzimmer"
     },
@@ -689,7 +678,6 @@ CONFIG_BAD = [
     {
         "type": "state",
         "name": "Badezimmer state",
-        "uses": 2,
         "timeout": "00:00:10@off",
         "group": "Badezimmer"
     },
@@ -789,8 +777,54 @@ CONFIG_HWR = [
         "timeout": "00:03:00",
         "dimtime": "00:00:20",
         "bindings": {
-            "on": { "type": "scene", "value": "Bright" },
+            "on": { "type": "redirect", "value": "112" },
             "recover": "on"
+        }
+    },
+    # on/off actions redirected from switch and motion sensor.
+    {
+        "type": "external",
+        "name": "HWR",
+        "group": "HWR",
+        "bindings": {
+            "112": {
+                "type": "scene",
+                "value": "Bright"
+            },
+            "113": {
+                "type": "off"
+            }
+        }
+    }
+]
+
+# Configuration for the basement
+CONFIG_BASEMENT = [
+    # Motion sensor to turn light on automatically.
+    {
+        "type": "motion",
+        "name": "Werk sensor",
+        "group": "Keller",
+        "timeout": "00:03:00",
+        "dimtime": "00:00:15",
+        "bindings": {
+            "on": { "type": "redirect", "value": "110" },
+            "recover": "on"
+        }
+    },
+    # on/off actions redirected from switch and motion sensor.
+    {
+        "type": "external",
+        "name": "Keller",
+        "group": "Keller",
+        "bindings": {
+            "110": {
+                "type": "scene",
+                "value": "Concentrate"
+            },
+            "111": {
+                "type": "off"
+            }
         }
     }
 ]

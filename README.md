@@ -26,19 +26,18 @@ Example:
 {
     "type": "state",
     "name": "My state",
-    "uses": 2,
     "timeout": "00:00:10@off",
     "group": "My group"	# only needed for @off timeout
 }
 ```
 
 State sensor is used to store the state of a switch. One state sensor can be used to store two
-states in parallel (indicated by `uses: 2`), e.g., for cycling through scenes on `on` button
-and cycling between off and nightlight scene on `off` button.
+states in parallel, e.g., for cycling through scenes on `on` button and cycling between off and
+nightlight scene on `off` button.
 
 If `timeout` is set, then the state sensor resets to 0 after this timeout (HH:MM:SS). Depending
 on use count, this will create one or two rules to reset the state after timeout. The timeout
-may be suffixed with '@off' to only reset the sensor if no lights are on. In that case, a check
+may be suffixed with `@off` to only reset the sensor if no lights are on. In that case, a check
 will be done whether any light is on in the group and the sensor will be reset only in case no
 light is on. This is typically the desired behavior (cycle scenes until switched off).
 
@@ -51,7 +50,7 @@ can be counter-acted by setting a timeout, which is only active when the light i
 to set a night light, you turn off the lights, then press off button once again, which will
 activate the night light.
 
-State virtual sensor creates one CLIP sensor.
+State virtual sensor creates one CLIP sensor and optionally one rule to reset the sensor.
 
 
 ### Switch sensor
@@ -267,8 +266,7 @@ Example:
 ```python
 {
     "type": "state",
-    "name": "My state",
-    "uses": 2
+    "name": "My state"
 },
 {
     "type": "switch",
@@ -459,7 +457,6 @@ CONFIG_LR = [
     {
         "type": "state",
         "name": "Livingroom state",
-        "uses": 2,
         "timeout": "00:00:10"
     },
     # Actions for input - either external input or via the wall switch
