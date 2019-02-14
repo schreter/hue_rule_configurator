@@ -1098,6 +1098,14 @@ class HueBridge():
                 "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
                 "operator": "lt",
                 "value": "1"
+            },
+            # NOTE: only turn on if it was off at least for a second. This prevents
+            # a situation where light on redirects to a rule is after light off rule,
+            # effectively making turning light off impossible.
+            {
+                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "operator": "stable",
+                "value": "PT00:00:01"
             }
         ]
         actions = [
