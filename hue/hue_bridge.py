@@ -1260,6 +1260,36 @@ class HueBridge():
                 "conditions": conditions,
                 "actions": actionstodim
             })
+        if "contact" in desc and "closedtimeout" in desc:
+            # rule(5b): Requested timeout when the door is closed and light was turned on permanently.
+            # This is a safety net if door contact breaks.
+            conditions = [
+                {
+                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "operator": "eq",
+                    "value": "false"
+                },
+                # ddx on last update of state sensor instead of presence sensor to turn off
+                # also after switching light on w/o movement
+                {
+                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/lastupdated",
+                    "operator": "ddx",
+                    "value": "PT" + desc["closedtimeout"]
+                },
+                {
+                    "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                    "operator": "eq",
+                    "value": "1"
+                }
+            ] + contactClosedCond
+            if dimactions:
+                self.__createRulesForAction(dimactions, name, "dim", dimstatecopy, conditions, actionstodim)
+            else:
+                self.__rulesToCreate.append({
+                    "name": name + "/dim.closed",
+                    "conditions": conditions,
+                    "actions": actionstodim
+                })
 
         # handling for state 2: motion detected, lights are on
         
@@ -1546,12 +1576,9 @@ class HueBridge():
 
             # rule(12): check after a 16s timeout:
             #    if no motion is detected and state is still 3 turn lights off and keep state 3
-            closedtimeout = "PT00:00:16"
-            if "closedtimeout" in desc:
-                closedtimeout = desc["closedtimeout"]
-            closedtt = 200  # 20 seconds to dark
-            if "closedtt" in desc:
-                closedtt = desc["closedtt"]
+            closedchecktime = "PT00:00:16"
+            if "closedchecktime" in desc:
+                closedchecktime = "PT" + desc["closedchecktime"]
             actions = []
             conditions = [
                 {
@@ -1572,7 +1599,7 @@ class HueBridge():
                 {
                     "address": "/sensors/${sensor:" + contactName + "}/state/lastupdated",
                     "operator": "ddx",
-                    "value": closedtimeout
+                    "value": closedchecktime
                 }
             ]
             if dimactions:

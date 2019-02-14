@@ -229,12 +229,14 @@ turning light on or off.
 
 Optionally, a contact sensor defined in the same configuration can be addressed using `contact`
 parameter. When there is no motion detected shortly after closing the door, the light is turned
-off, by default after 16 seconds (use `closedtimeout` to override), by first dimming and then
+off, by default after 16 seconds (use `closedchecktime` to override), by first dimming and then
 turning it to off, similar to normal timeout handling. Else, it is kept on until the door is
 open again (and then normal rules with timeout apply). In case there is no motion detected
 initially by mistake (due to reaction time of non-motion detection) and the light dims, motion
-in the room will restore the light and won't dim it again until the door is open. As already
-mentioned, in sum, this behavior is extremely useful for bathrooms.
+in the room will restore the light and won't dim it again until the door is open. Optionally,
+if the sensor breaks, a fallback timeout can be specified via `closedtimeout` to turn light off
+after specified time of no motion behind closed door. As already mentioned, in sum, this behavior
+is extremely useful for bathrooms.
 
 If a motion sensor is used with a switch, then turning off the light while motion is detected
 would simply turn the light back on immediately. To prevent this, the motion sensor adds rules
