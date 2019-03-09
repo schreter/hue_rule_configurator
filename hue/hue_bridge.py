@@ -974,7 +974,6 @@ class HueBridge():
                     rule(13b): if dimmed, undim the light
             rule(14): after manually switched on when door closed, change to state 2 (will fall to 1 on no motion)
                 and set door closed again to force reevaluation via rule(12)
-            rule(15): after manually switched off when door closed, change state to -1
 
         Motion sensor supports following bindings:
             - "on" - turn on the lights
@@ -1460,16 +1459,16 @@ class HueBridge():
             }
         )
         
-        # rule(10): after manually switched off when door open, change state to -2
+        # rule(10): after manually switched off, change state to -2 after delay of 1s
         self.__rulesToCreate.append(
             {
                 "name": name + "/switch.off",
                 "actions" : [
                     {
-                        "address": "/sensors/${sensor:" + stateSensorName + "}/state",
+                        "address": "/schedules/${schedule:" + stateSensorName + "}",
                         "method": "PUT",
                         "body": {
-                            "status": -2    # this prevents turning on by sensor
+                            "status": "enabled"    # start 1s timer
                         }
                     }
                 ],
@@ -1488,42 +1487,26 @@ class HueBridge():
                         "address": "/groups/" + groupID + "/state/any_on",
                         "operator": "dx"
                     }
-                ] + contactOpenCond
+                ] 
             }
         )
-        if "contact" in desc:
-            # rule(15): after manually switched off when door closed, change state to -1
-            self.__rulesToCreate.append(
-                {
-                    "name": name + "/switch.off.closed",
-                    "actions" : [
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state",
-                            "method": "PUT",
-                            "body": {
-                                "status": -1    # this allows immediately turning light back on on presence
-                            }
-                        }
-                    ],
-                    "conditions" : [
-                        {
-                            "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
-                            "operator": "gt",
-                            "value": "-1"
-                        },
-                        {
-                            "address": "/groups/" + groupID + "/state/any_on",
-                            "operator": "eq",
-                            "value": "false"
-                        },
-                        {
-                            "address": "/groups/" + groupID + "/state/any_on",
-                            "operator": "dx"
-                        }
-                    ] + contactClosedCond
+        self.__schedulesToCreate.append(
+            {
+                "name": stateSensorName,
+                "description": stateSensorName + " (reset after off)",
+                "status": "disabled",
+                "autodelete": False,
+                "localtime": "PT00:00:01",
+                "command": {
+                    "address": "/api/" + self.apiKey + "/sensors/${sensor:" + stateSensorName + "}/state",
+                    "method": "PUT",
+                    "body": {
+                        "status": -2    # this disables the sensor for some time
+                    }
                 }
-            )
-
+            }
+        )
+        
         # Handling for state -2 for timeouts on switch on/off
         # rule(11): after off timeout, change state -2->-1
         offtimeout = "PT00:00:30"

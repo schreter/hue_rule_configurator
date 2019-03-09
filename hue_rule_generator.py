@@ -282,6 +282,9 @@ CONFIG_WC = [
         # sensor doesn't "see" the motion). Similarly, if there is no motion whatsoever after
         # closing the door, turn lights off shortly after.
         "contact": "WC door contact",
+        # Force timeout even on closed door contact after 20 minutes. This is a safety net
+        # if the contact breaks. Any motion within this time period will reset the timer.
+        "closedtimeout": "00:20:00",
         "bindings": {
             # Again, redirect via external input to have common code for switch and motion sensor.
             "on": { "type": "redirect", "value": "108" },
@@ -716,9 +719,8 @@ CONFIG_BAD = [
         "type": "motion",
         "name": "Badezimmer sensor",
         "group": "Badezimmer",
-        # Unfortunately, problems with receipt of EnOcean door switch sensor, so for now high timeouts to work as without the contact switch
-        "timeout": "00:30:00",
-        "dimtime": "00:02:00",
+        "timeout": "00:02:00",
+        "dimtime": "00:00:30",
         "state": "Badezimmer state",
         # Cooperate with the contact to prevent turning lights on when door is closed and
         # someone is inside (and for instance taking a shower behind glass door, so the

@@ -246,8 +246,8 @@ in the app).
 
 Motion sensor creates one CLIP sensor to store sensor state and 6 rules for standard motion handling,
 3 rules for integration with switches to properly handle manually turning light on or off and if
-a door contact is used, then additional 5 rules for handling door contact. I.e., depending on
-the configuration, up to 14 rules are used for a single motion sensor.
+a door contact is used, then additional 4 rules for handling door contact. I.e., depending on
+the configuration, up to 13 rules are used for a single motion sensor.
 
 
 ## Action types
