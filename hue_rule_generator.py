@@ -692,7 +692,7 @@ CONFIG_BAD = [
         "bindings": {
             "tl": { "type": "redirect", "value": "65" },
             "bl": { "type": "redirect", "value": "66" },
-            "tr": { "type": "light", "light": "Badezimmer Spiegel", "action": "toggle" },
+            "tr": { "type": "light", "light": "Badezimmer Spiegel", "action": "on" },
             "br": { "type": "light", "light": "Badezimmer Spiegel", "action": "off" },
             "tlr": {
                 "type": "scene",

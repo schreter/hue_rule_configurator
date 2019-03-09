@@ -16,17 +16,21 @@ OFF_BINDING = { "type": "scene", "configs": [ {"scene": "off"} ] }
 BUTTON_MAP = {
     # mapping for dimmer
     "on": "1000",
+    "on-release": "1002",
     "on-hold": "1001",
-    "on-release": "1003",
+    "on-hold-release": "1003",
     "brighter": "2000",
+    "brighter-release": "2002",
     "brighter-hold": "2001",
-    "brighter-release": "2003",
+    "brighter-hold-release": "2003",
     "darker": "3000",
+    "darker-release": "3002",
     "darker-hold": "3001",
-    "darker-release": "3003",
+    "darker-hold-release": "3003",
     "off": "4000",
+    "off-release": "4002",
     "off-hold": "4001",
-    "off-release": "4003",
+    "off-hold-release": "4003",
     # mapping for tap switches (normal)
     "1": "34",
     "2": "16",
@@ -54,14 +58,22 @@ class HueBridge():
     See README.md for description of the configuration.
     """
 
-    # Rules to append to bindings for a dimmer for dimming up/down. Requires group set in descriptor.
+#     # Original rules to append to bindings for a dimmer for dimming up/down. Requires group set in descriptor.
+#     DIMMER_RULES = {
+#         "brighter": { "type": "dim", "value": 30 },
+#         "brighter-hold": { "type": "dim", "value": 56 },
+#         "brighter-hold-release": { "type": "dim", "value": 0, "tt": 0 },
+#         "darker": { "type": "dim", "value": -30 },
+#         "darker-hold": { "type": "dim", "value": -56 },
+#         "darker-hold-release": { "type": "dim", "value": 0, "tt": 0 }
+#     }
+
+    # Simpler rules to append to bindings for a dimmer for dimming up/down. Requires group set in descriptor.
     DIMMER_RULES = {
-        "brighter": { "type": "dim", "value": 30 },
-        "brighter-hold": { "type": "dim", "value": 56 },
-        "brighter-release": { "type": "dim", "value": 0, "tt": 0 },
-        "darker": { "type": "dim", "value": -30 },
-        "darker-hold": { "type": "dim", "value": -56 },
-        "darker-release": { "type": "dim", "value": 0, "tt": 0 }
+        "brighter": { "type": "dim", "value": 254, "tt": 35 },
+        "brighter-any-release": { "type": "dim", "value": 0, "tt": 0 },
+        "darker": { "type": "dim", "value": -254, "tt": 35 },
+        "darker-any-release": { "type": "dim", "value": 0, "tt": 0 }
     }
 
     def __init__(self, bridge, apiKey):
@@ -877,15 +889,44 @@ class HueBridge():
             binding = bindings[button]
             conditions = [
                 {
-                    "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
-                    "operator": "eq",
-                    "value": HueBridge.__mapButton(button)
-                },
-                {
                     "address": "/sensors/${sensor:" + switchName + "}/state/lastupdated",
                     "operator": "dx"
                 }
             ]
+            if button == "brighter-any-release":
+                conditions += [
+                    {
+                        "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
+                        "operator": "gt",
+                        "value": "2001"
+                    },
+                    {
+                        "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
+                        "operator": "lt",
+                        "value": "2004"
+                    }
+                ]
+            elif button == "darker-any-release":
+                conditions += [
+                    {
+                        "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
+                        "operator": "gt",
+                        "value": "3001"
+                    },
+                    {
+                        "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
+                        "operator": "lt",
+                        "value": "3004"
+                    }
+                ]
+            else:
+                conditions.append(
+                    {
+                        "address": "/sensors/${sensor:" + switchName + "}/state/buttonevent",
+                        "operator": "eq",
+                        "value": HueBridge.__mapButton(button)
+                    }
+                )
             self.__createRulesForAction(binding, switchName, button, state, conditions, [])
         
     def __rulesForExternal(self, desc):
