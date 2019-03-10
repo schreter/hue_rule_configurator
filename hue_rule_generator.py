@@ -363,7 +363,9 @@ CONFIG_HW = [
                     "T18:00:00/T23:00:00": 2,
                 }
             },
-            "103": { "type": "off", "state": "Flur state" }
+            "103": { "type": "off", "state": "Flur state" },
+            "130": { "type": "off", "group": "UG" },
+            "131": { "type": "off", "group": "UGEG" }
         }
     },
 
