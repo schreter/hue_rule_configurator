@@ -44,7 +44,9 @@ CONFIG_LR = [
                 # the given value (index of scene in binding 14 below)
                 "state": "Wohnzimmer state",
                 "setstate": 4
-            }
+            },
+            # Use both bottom buttons together to switch off the light in both living room and kitchen
+            "blr": { "type": "redirect", "value": "19" }
         }
     },
     # Actions for external input from an Enocean switch (similar to Philips Tap)
@@ -107,6 +109,12 @@ CONFIG_LR = [
                 "type": "light",
                 "light": "Stromček",
                 "action": "toggle"
+            },
+            # Action for switching off both living room and kitchen lights
+            "19": {
+                "type": "off",
+                "group": "Wohnküche",
+                "state": "Wohnzimmer state"
             }
 
             # We also have external action "11" sent by the switch in the living room.
@@ -156,7 +164,9 @@ CONFIG_KITCHEN = [
                 # room defined above.
                 "type": "redirect",
                 "value": "12",
-            }
+            },
+            # Use both bottom buttons together to switch off the light in both living room and kitchen
+            "blr": { "type": "redirect", "value": "19" }
         }
     },
     # Definition of external actions for kitchen
@@ -759,13 +769,7 @@ CONFIG_BAD = [
                 }
             },
             "66": {
-                "type": "scene",
-                "group": "Badezimmer",
-                "stateUse": "secondary",
-                "configs": [
-                    {"scene": "off"},
-                    {"scene": "Nightlight", "timeout": "00:10:00"}
-                ]
+                "type": "off"
             }
         }
     }
