@@ -1143,7 +1143,7 @@ class HueBridge():
             # a situation where light on redirects to a rule is after light off rule,
             # effectively making turning light off impossible.
             {
-                "address": "/sensors/${sensor:" + stateSensorName + "}/state/status",
+                "address": "/groups/${group:" + groupName + "}/state/any_on",
                 "operator": "stable",
                 "value": "PT00:00:01"
             }
