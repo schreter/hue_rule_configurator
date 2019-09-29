@@ -230,6 +230,42 @@ CONFIG_KITCHEN = [
     }
 ]
 
+# Configuration for the dining room (connected with living room)
+CONFIG_DINING = [
+    # State for cycling the switch
+    {
+        "type": "state",
+        "name": "Essen state"
+    },
+    # Definition of external actions for dining room
+    {
+        "type": "external",
+        "name": "Essen",
+        "group": "Essen",
+        "state": "Essen state",
+        "bindings": {
+            # Turn on the light, based on time
+            "71": {
+                "type": "scene",
+                "configs": [
+                    {"scene": "Concentrate"},
+                    {"scene": "Tag"},
+                    {"scene": "Abend"},
+                    {"scene": "TV"}
+                ],
+                "times": {
+                    "T06:00:00/T21:00:00": 1,
+                    "T21:00:00/T06:00:00": 3
+                }
+            },
+            # Turn off the light above dining table
+            "70": {
+                "type": "off"
+            }
+        }
+    }
+]
+
 # Configuration for home office
 CONFIG_AZ = [
     # State for cycling the switch
@@ -863,6 +899,7 @@ if __name__ == '__main__':
     # run configuration on individual resources/rooms
     h.configure(CONFIG_LR, "Wohnzimmer")
     h.configure(CONFIG_KITCHEN, "Küche")
+    h.configure(CONFIG_DINING, "Esszimmer")
     h.configure(CONFIG_AZ, "Arbeitszimmer")
     h.configure(CONFIG_WC, "Gäste-WC")
     h.configure(CONFIG_HW, "Flure")
@@ -871,6 +908,7 @@ if __name__ == '__main__':
     h.configure(CONFIG_B, "Schlafzimmer")
     h.configure(CONFIG_BAD, "Badezimmer")
     h.configure(CONFIG_HWR, "HWR")
+    h.configure(CONFIG_BASEMENT, "Keller")
     #h.configure(CONFIG_TEST, "Test")    # not yet working correctly
     #h.configure(CONFIG_BOOT, "Boot")    # not yet working correctly
 
