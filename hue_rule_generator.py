@@ -214,7 +214,7 @@ CONFIG_KITCHEN = [
     {
         "type": "motion",
         "name": "Küche sensor",     # motion sensor name as defined in Philips app
-        "group": "Küche",           # group to control (for default off action)
+        "group": "Küche Oberlicht", # group to control (only ceiling light)
         "timeout": "00:03:00",      # timeout after no motion detected to dim the light
         "dimtime": "00:00:20",      # timeout to turn off lights after dimming
         "state": "Küche state",     # switch state sensor to reset to activate default action
@@ -223,9 +223,9 @@ CONFIG_KITCHEN = [
             "on": { "type": "redirect", "value": "29" },
             # Specify optional recover action to prevent the need for saving scene state
             # on each dimming (and wearing off the lamps). We use default dim action here.
-            "recover": { "type": "redirect", "value": "29" }
-            # No need to specify off action, it's the default
-            #"off": { "type": "off" }
+            "recover": { "type": "redirect", "value": "29" },
+            # Off action turns off all lights in the kitchen, not only ceiling light
+            "off": { "type": "redirect", "value": "11" }
         }
     }
 ]
