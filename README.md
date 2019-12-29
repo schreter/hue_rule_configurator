@@ -253,7 +253,7 @@ the configuration, up to 13 rules are used for a single motion sensor.
 ## Action types
 
 For each binding, there must be an action specified. Currently, following actions are supported:
-- `scene` - set scene (supports multi-scene and time-dependent scenes)
+- `scene` - set scene (supports multi-scene and time-dependent scenes and toggle with scene)
 - `off` - turn a group of lights off
 - `light` - turn a single light on, off or toggle its state
 - `dim` - dim up or down a group
@@ -332,6 +332,26 @@ for binding 2 and 3 rules for binding 1.
 
 Each timeout to turn off lights in a specified scene after a timeout adds one additional rule.
 
+In addition to normal time and count dependent scene scheduling, it is also possible to set
+additional action using `action` parameter. Currently, the only available action is `toggle`
+to toggle the light state of a group by setting it to a specific scene if off or turning it
+off if on.
+
+Example:
+```python
+{
+    "type": "switch",
+    "name": "Kitchen cabinet",
+    "bindings": {
+        "on": {
+            "type": "scene",                # group action 
+            "group": "Kitchen cabinet",     # group to manage
+            "value": "Concentrate",         # scene to set
+            "action": "toggle"              # toggle between on/off states only (single config)
+        }
+    }
+}
+```
 
 ### Off
 

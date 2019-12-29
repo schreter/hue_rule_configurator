@@ -577,6 +577,43 @@ class HueBridge():
                     "body": { "status": 0 }
                 }
             ]
+
+        toggleCond = []
+        if "action" in binding:
+            action = binding["action"]
+            if action != "toggle":
+                raise Exception("Currently only toggle action is supported for scene " + name + "/" + ref)
+            
+            # toggle action - only use the rules if the light is off
+            group = state["group"]
+            groupID = self.__groups_idx[group]
+            toggleCond = [
+                {
+                    "address": "/groups/" + groupID + "/state/any_on",
+                    "operator": "eq",
+                    "value": "false"
+                }
+            ]
+            # rule to turn off the light, if any in group on
+            rule = {
+                "name": name + "/" + ref + "/off",
+                "conditions": conditions + [{
+                        "address": "/groups/" + groupID + "/state/any_on",
+                        "operator": "eq",
+                        "value": "true"
+                    }],
+                "actions": resetstateactions + [
+                    {
+                        "address": "/groups/" + groupID + "/action",
+                        "method": "PUT",
+                        "body": {
+                            "on": False
+                        }
+                    }
+                ]
+            }
+            self.__rulesToCreate.append(rule)
+
         if "setstate" in binding:
             if not "state" in state:
                 raise Exception("Missing state configuration to be able to set state of the switch via setstate")
@@ -625,7 +662,7 @@ class HueBridge():
                             }
                         }
                     ]
-                    self.__singleSceneRules(config, cname, state, stateCond + conditions, stateAction + actions)
+                    self.__singleSceneRules(config, cname, state, stateCond + conditions + toggleCond, stateAction + actions)
                 
             if "times" in binding:
                 # multiple time-based rules to turn on scenes, get the one for this index
@@ -660,7 +697,7 @@ class HueBridge():
                                     }
                                 }
                             ]
-                        self.__singleSceneRules(config, cname + "/T" + str(tidx), state, conditions + stateCond, stateAction + actions)
+                        self.__singleSceneRules(config, cname + "/T" + str(tidx), state, conditions + stateCond + toggleCond, stateAction + actions)
                     tidx = tidx + 1
             elif index == 0:
                 if multistate and "state" in state:
@@ -681,10 +718,10 @@ class HueBridge():
                             }
                         }
                     ]
-                    self.__singleSceneRules(config, cname + "/in", state, conditions + stateCond, actions + stateAction)
+                    self.__singleSceneRules(config, cname + "/in", state, conditions + stateCond + toggleCond, actions + stateAction)
                 else:
                     # single config, no additional conditions
-                    self.__singleSceneRules(config, cname, state, conditions, resetstateactions + actions)
+                    self.__singleSceneRules(config, cname, state, conditions + toggleCond, resetstateactions + actions)
 
             if "timeout" in config:
                 # create extra rule to turn off light in this state
@@ -721,7 +758,7 @@ class HueBridge():
 
                 rule = {
                     "name": cname + "/TO" + str(index),
-                    "conditions": stateCond + [{
+                    "conditions": stateCond + toggleCond + [{
                             "address": "/groups/" + groupID + "/state/any_on",
                             "operator": "eq",
                             "value": "true"
