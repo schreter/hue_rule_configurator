@@ -170,6 +170,7 @@ class HueBridge():
         self.__rulesToCreate = []
         self.__sensorsToDelete = []
         self.__sensorsToCreate = []
+        self.__sensorsForGroups = {}
         self.__schedulesToDelete = []
         self.__schedulesToCreate = []
         self.__groupsToAdd = []
@@ -245,13 +246,26 @@ class HueBridge():
         result = json.loads(tmp.text)[0];
         if not "success" in result:
             print("Data:", sensorData)
-            raise Exception("Cannot sensor rule " + name + ": " + tmp.text)
+            raise Exception("Cannot create sensor " + name + ": " + tmp.text)
         sensorID = result["success"]["id"]
         self.__sensors_idx[name] = sensorID
         sensorData["owner"] = self.apiKey
         self.__sensors[sensorID] = sensorData
         print("Created sensor", sensorID, name)
         return sensorID
+
+    def __setGroupSensor(self, groupID, sensors):
+        sensorData = {"sensors": sensors}
+        tmp = requests.put(self.urlbase + "/groups/" + groupID, json=sensorData)
+        if tmp.status_code != 200:
+            print("Data:", sensorData)
+            raise Exception("Cannot assign sensors to group " + groupID + ": " + tmp.text)
+        result = json.loads(tmp.text)[0];
+        if not "success" in result:
+            print("Data:", sensorData)
+            raise Exception("Cannot assign sensors to group " + groupID + ": " + tmp.text)
+        self.__groups[groupID]["sensors"] = sensors
+        print("Set sensors", sensors, "for group", groupID)
 
     def __deleteRule(self, ruleID):
         name = self.__rules[ruleID]["name"]
@@ -1000,7 +1014,34 @@ class HueBridge():
                 }
             ]
             self.__createRulesForAction(binding, name, extID, state, conditions, actions)
-                    
+            
+    def __findMotionSensor(self, name):
+        """
+        Find motion sensor and associated light sensor by name.
+        
+        Return tuple with motion and light sensor IDs.
+        """
+
+        sensorID = self.findSensor(name)
+        if not sensorID:
+            raise Exception("Sensor '" + name + "' not found")
+        if self.__sensors[sensorID]["type"] != "ZLLPresence":
+            raise Exception("Sensor '" + name + "' is not a presence sensor")
+
+        sensorAddress = self.__sensors[sensorID]["uniqueid"][0:24]
+        lightSensorID = None
+        for key in self.__sensors.keys():
+            s = self.__sensors[key]
+            if s["type"] != "ZLLLightLevel":
+                continue
+            if s["uniqueid"][0:24] == sensorAddress:
+                lightSensorID = key
+                break
+        if not lightSensorID:
+            raise Exception("Light level sensor for '" + name + "' not found")
+
+        return sensorID, lightSensorID
+               
     def __rulesForMotion(self, desc):
         """
         Create rules for motion sensor 
@@ -1073,27 +1114,33 @@ class HueBridge():
         groupID = self.__groups_idx[groupName]
         bindings = desc["bindings"]
         stateSensorName = name + " state"
-        sensorID = self.findSensor(name)
-        if not sensorID:
-            raise Exception("Sensor '" + name + "' not found")
-        if self.__sensors[sensorID]["type"] != "ZLLPresence":
-            raise Exception("Sensor '" + name + "' is not a presence sensor")
-        self.__rulesToDelete += self.findRulesForSensorID(sensorID)
+
+        # determine whether to use group or single sensor
+        presenceSensorAddress = "/groups/" + groupID + "/presence/state/presence"
+        darkSensorAddress = "/groups/" + groupID + "/lightlevel/state/dark"
+        if "sensors" in desc:
+            # use sensor array
+            groupSensors = []
+            for sensor in desc["sensors"]:
+                psid, dsid = self.__findMotionSensor(sensor)
+                self.__rulesToDelete += self.findRulesForSensorID(psid)
+                self.__rulesToDelete += self.findRulesForSensorID(dsid)
+                # assign sensors to the group
+                groupSensors += [psid, dsid]
+            self.__sensorsForGroups[groupID] = groupSensors
+        else:
+            # single sensor
+            psid, dsid = self.__findMotionSensor(name)
+            self.__rulesToDelete += self.findRulesForSensorID(psid)
+            self.__rulesToDelete += self.findRulesForSensorID(dsid)
+            presenceSensorAddress = "/sensors/" + psid + "/state/presence"
+            darkSensorAddress = "/sensors/" + dsid + "/state/dark"
+            
+        # state sensor to describe state of the motion detection and light state in the room
         self.__prepareSensor({
             "type": "state",
             "name": stateSensorName
         })
-        sensorAddress = self.__sensors[sensorID]["uniqueid"][0:24]
-        lightSensorID = None
-        for key in self.__sensors.keys():
-            s = self.__sensors[key]
-            if s["type"] != "ZLLLightLevel":
-                continue
-            if s["uniqueid"][0:24] == sensorAddress:
-                lightSensorID = key
-                break
-        if not lightSensorID:
-            raise Exception("Light level sensor for '" + name + "' not found")
         
         # recovery scene handling
         sceneName = name + " recover"
@@ -1161,12 +1208,12 @@ class HueBridge():
         # rule(1): motion detected in dark and lights off: turn on lights and switch to state 1
         conditions = [
             {
-                "address": "/sensors/" + sensorID + "/state/presence",
+                "address": presenceSensorAddress,
                 "operator": "eq",
                 "value": "true"
             },
             {
-                "address": "/sensors/" + lightSensorID + "/state/dark",
+                "address": darkSensorAddress,
                 "operator": "eq",
                 "value": "true"
             },
@@ -1253,7 +1300,7 @@ class HueBridge():
             "name": name + "/motion",
             "conditions": [
                 {
-                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "address": presenceSensorAddress,
                     "operator": "eq",
                     "value": "true"
                 },
@@ -1281,7 +1328,7 @@ class HueBridge():
         #          dim lights and enter state 3
         conditions = [
             {
-                "address": "/sensors/" + sensorID + "/state/presence",
+                "address": presenceSensorAddress,
                 "operator": "eq",
                 "value": "false"
             },
@@ -1347,7 +1394,7 @@ class HueBridge():
             # This is a safety net if door contact breaks.
             conditions = [
                 {
-                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "address": presenceSensorAddress,
                     "operator": "eq",
                     "value": "false"
                 },
@@ -1381,7 +1428,7 @@ class HueBridge():
             "name": name + "/no.pres",
             "conditions": [
                 {
-                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "address": presenceSensorAddress,
                     "operator": "eq",
                     "value": "false"
                 },
@@ -1461,12 +1508,12 @@ class HueBridge():
         #  rule(8): if motion is detected in state 3: recover light state and change state to 2
         conditions = [
             {
-                "address": "/sensors/" + sensorID + "/state/presence",
+                "address": presenceSensorAddress,
                 "operator": "eq",
                 "value": "true"
             },
             {
-                "address": "/sensors/" + sensorID + "/state/presence",
+                "address": presenceSensorAddress,
                 "operator": "dx"
             },
             {
@@ -1648,7 +1695,7 @@ class HueBridge():
             actions = []
             conditions = [
                 {
-                    "address": "/sensors/" + sensorID + "/state/presence",
+                    "address": presenceSensorAddress,
                     "operator": "eq",
                     "value": "false"
                 },
@@ -2126,6 +2173,10 @@ class HueBridge():
                 sensorID = self.__createSensor(i)
                 links.append("/sensors/" + sensorID)
 
+            # set group's sensors
+            for gid, sensors in self.__sensorsForGroups.items():
+                self.__setGroupSensor(gid, sensors)
+                
             # create scenes
             for gid in self.__scenesToCreate.keys():
                 #print("Scenes to create for group " + gid + ":")

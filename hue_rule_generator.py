@@ -303,6 +303,22 @@ CONFIG_AZ = [
                 "value": "off"
             }
         }
+    },
+    # Motion sensor to turn light on automatically.
+    {
+        "type": "motion",
+        "name": "Arbeitszimmer sensor",
+        "group": "Arbeitszimmer",
+        "timeout": "00:03:00",
+        "dimtime": "00:00:15",
+        "state": "Arbeitszimmer state",
+        "sensors": ["Arbeitszimmer sensor"], # could use more than one sensor here
+        "bindings": {
+            # Again, redirect via external input to have common code for switch and motion sensor.
+            "on": { "type": "redirect", "value": "33" },
+            # Use same action as "on" - shortcut to prevent duplicating the action
+            "recover": "on"
+        }
     }
 ]
 

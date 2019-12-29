@@ -250,6 +250,10 @@ Motion sensor creates one CLIP sensor to store sensor state and 6 rules for stan
 a door contact is used, then additional 4 rules for handling door contact. I.e., depending on
 the configuration, up to 13 rules are used for a single motion sensor.
 
+It is also possible to use multiple motion sensors for a room. Add `sensors` parameter with the
+list of sensors to use. These sensors will be assigned to the group representing the room and
+group's presence and light state will be used instead of the single motion sensor named by `name`. 
+
 
 ## Action types
 
