@@ -49,6 +49,11 @@ BUTTON_MAP = {
     "tlr": "101",
     "bottom-both": "99",
     "blr": "99"
+    # mapping for smart button - same as on button on dimmer
+    #"on": "1000",              # short press
+    #"on-release": "1002",      # release
+    #"on-hold": "1001",         # repeat while pressed
+    #"on-hold-release": "1003"  # release after holding for some time
     }
 
 class HueBridge():

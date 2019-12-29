@@ -169,18 +169,25 @@ CONFIG_KITCHEN = [
             "blr": { "type": "redirect", "value": "19" }
         }
     },
+    # Smart button to turn on/off the light under cabinet
+    {
+        "type": "switch",
+        "name": "Küche Unterlicht",
+        "bindings": {
+            "on": {
+                "type": "scene",                # group action 
+                "group": "Küche Unterlicht",    # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
+            }
+        }
+    },
     # Definition of external actions for kitchen
     {
         "type": "external",
         "name": "Küche",
         "group": "Küche",
         "bindings": {
-            # Action to toggle the light under the cabinet. Does not modify switch state.
-            "22": { 
-                "type": "light",                # single-light action as opposed to group action 
-                "light": "Küche Unterlicht",    # light name to manage
-                "action": "toggle"              # toggle between on/off states
-            },
             # Kitchen binding from above to turn on light, based on time
             "29": {
                 "type": "scene",

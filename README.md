@@ -76,12 +76,13 @@ for a Philips Tap switch whose sender was inserted into an Eltako frame and moun
 It defines actions for individual buttons by symbolic names instead of button IDs.
 
 Following symbolic names are supported:
-- `1`, `2`, `3` and `4` for original Philips Tap switch
+- `1`, `2`, `3` and `4` for original Hue Tap Switch,
 - `top-left`, `bottom-left`, `top-right` and `bottom-right` or `tl`, `bl`, `tr` and `br` for
-  Philips Tap switch sender built into Eltako switch frame and mounted on a wall
-- `on`, `on-hold`, `on-release`, `off`, `off-hold`, `off-release`, `brighter`, `brighter-hold`,
-  `brighter-release`, `darker`, `darker-hold`, `darker-release`, `off`, `off-hold` and
-  `off-release` for Philips dimmer buttons
+  Hue Tap Switch sender built into Eltako switch frame and mounted on a wall,
+- `on`, `on-hold`, `on-release`, `on-hold-release`, `off`, `off-hold`, `off-release`, `off-hold-release`,
+  `brighter`, `brighter-hold`, `brighter-release`, `brighter-hold-release`, `darker`, `darker-hold`,
+  `darker-release`, `darker-hold-release`, `off`, `off-hold`, `off-release` and `off-hold-release` for Hue Dimmer,
+- `on`, `on-hold`, `on-release` and `on-hold-release` for Hue Smart Button.
 
 Each binding creates by default one rule, except multi-scene and toggle bindings (see later).
 
