@@ -1412,10 +1412,10 @@ class HueBridge():
                 }
             ] + contactClosedCond
             if dimactions:
-                self.__createRulesForAction(dimactions, name, "dim", dimstatecopy, conditions, actionstodim)
+                self.__createRulesForAction(dimactions, name, "timeout", dimstatecopy, conditions, actionstodim)
             else:
                 self.__rulesToCreate.append({
-                    "name": name + "/dim.closed",
+                    "name": name + "/timeout",
                     "conditions": conditions,
                     "actions": actionstodim
                 })
@@ -1560,7 +1560,7 @@ class HueBridge():
         # rule(9): after manually switched on, change state to 2 (which will transition to 1 upon no motion)
         self.__rulesToCreate.append(
             {
-                "name": name + "/switch.on",
+                "name": name + "/sw.on",
                 "actions" : [
                     {
                         "address": "/sensors/${sensor:" + stateSensorName + "}/state",
@@ -1592,7 +1592,7 @@ class HueBridge():
         # rule(10): after manually switched off, change state to -2 after delay of 1s
         self.__rulesToCreate.append(
             {
-                "name": name + "/switch.off",
+                "name": name + "/sw.off",
                 "actions" : [
                     {
                         "address": "/schedules/${schedule:" + stateSensorName + "}",
@@ -1716,10 +1716,10 @@ class HueBridge():
                 }
             ]
             if dimactions:
-                self.__createRulesForAction(dimactions, name, "clo.off", dimstatecopy, conditions, actionstodim)
+                self.__createRulesForAction(dimactions, name, "dim.closed", dimstatecopy, conditions, actionstodim)
             else:
                 self.__rulesToCreate.append({
-                    "name": name + "/clo.off",
+                    "name": name + "/dim.closed",
                     "conditions": conditions,
                     "actions": actionstodim
                 })
@@ -1737,7 +1737,7 @@ class HueBridge():
                 }
             ] + contactClosedCond
             self.__rulesToCreate.append({
-                "name": name + "/switch.on.closed",
+                "name": name + "/sw.on.closed",
                 "conditions": conditions,
                 "actions" : actions + [
                     {
@@ -1815,10 +1815,10 @@ class HueBridge():
                             "body": { "status": 0 }
                         }
                     )
-                self.__createRulesForAction(recoveractions, name, "recover.open", state, conditions, [], actions)
+                self.__createRulesForAction(recoveractions, name, "open.recover", state, conditions, [], actions)
             else:
                 self.__rulesToCreate.append({
-                    "name": name + "/recover.open",
+                    "name": name + "/open.recover",
                     "conditions": conditions,
                     "actions": [{
                         "address": "/groups/" + groupID + "/action",

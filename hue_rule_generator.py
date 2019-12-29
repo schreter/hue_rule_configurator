@@ -388,8 +388,8 @@ CONFIG_WC = [
 ]
 
 # Hallways
-CONFIG_HW = [
-    # This demonstrates three hallways with their respective motion sensor and switches.
+CONFIG_HWEGUG = [
+    # This demonstrates two hallways with their respective motion sensor and switches.
     # There are several switches for each hallway, but their actions are mapped to the
     # same external input code, so we need only one set of rules for all of them.
     # All use the same pattern of double-redirect to disable the motion sensor for a short
@@ -435,62 +435,6 @@ CONFIG_HW = [
             "103": { "type": "off", "state": "Flur state" },
             "130": { "type": "off", "group": "UG" },
             "131": { "type": "off", "group": "UGEG" }
-        }
-    },
-
-    {
-        "type": "motion",
-        "name": "Gallerie sensor",
-        "group": "Gallerie",
-        "timeout": "00:01:30",
-        "dimtime": "00:00:20",
-        "state": "Gallerie state",
-        "bindings": {
-            "on": { "type": "redirect", "value": "104" },
-            "dim": {
-                # Here we use special dimming method. In case we are dimming during the day,
-                # then just dim as usual by decreasing the brightness by half (-128/256).
-                # But, in the night, the light is alredy at the smallest possible intensity,
-                # so instead switch off one of the two lights to simulate dimming (though not
-                # optimal, since brightness is logarithmic).
-                "type": "scene",
-                "configs": [
-                    {"scene": "NightDim"},  # this is the scene with only one light on
-                    {"scene": "dim", "value": -128}
-                ],
-                "times": {
-                    "T23:00:00/T06:00:00": 1,
-                    "T06:00:00/T23:00:00": 2
-                }
-            },
-            "recover": "on"
-        }
-    },
-    {
-        "type": "state",
-        "name": "Gallerie state"
-    },
-    {
-        "type": "external",
-        "name": "Gallerie",
-        "group": "Gallerie",
-        "bindings": {
-            # on action redirected from motion sensor above as well
-            "104": {
-                "type": "scene",
-                "state": "Gallerie state",
-                "configs": [
-                    {"scene": "Night"},
-                    {"scene": "Evening"},
-                    {"scene": "Day"}
-                ],
-                "times": {
-                    "T23:00:00/T06:00:00": 1,
-                    "T06:00:00/T20:30:00": 3,
-                    "T20:30:00/T23:00:00": 2
-                }
-            },
-            "105": { "type": "off", "state": "Gallerie state" }
         }
     },
 
@@ -546,13 +490,71 @@ CONFIG_HW = [
     }
 ]
 
+CONFIG_HWOG = [
+    {
+        "type": "motion",
+        "name": "Gallerie sensor",
+        "group": "Gallerie",
+        "timeout": "00:01:30",
+        "dimtime": "00:00:20",
+        "state": "Gallerie state",
+        "bindings": {
+            "on": { "type": "redirect", "value": "104" },
+            "dim": {
+                # Here we use special dimming method. In case we are dimming during the day,
+                # then just dim as usual by decreasing the brightness by half (-128/256).
+                # But, in the night, the light is alredy at the smallest possible intensity,
+                # so instead switch off one of the two lights to simulate dimming (though not
+                # optimal, since brightness is logarithmic).
+                "type": "scene",
+                "configs": [
+                    {"scene": "NightDim"},  # this is the scene with only one light on
+                    {"scene": "dim", "value": -128}
+                ],
+                "times": {
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T23:00:00": 2
+                }
+            },
+            "recover": "on"
+        }
+    },
+    {
+        "type": "state",
+        "name": "Gallerie state"
+    },
+    {
+        "type": "external",
+        "name": "Gallerie",
+        "group": "Gallerie",
+        "bindings": {
+            # on action redirected from motion sensor above as well
+            "104": {
+                "type": "scene",
+                "state": "Gallerie state",
+                "configs": [
+                    {"scene": "Night"},
+                    {"scene": "Evening"},
+                    {"scene": "Day"}
+                ],
+                "times": {
+                    "T23:00:00/T06:00:00": 1,
+                    "T06:00:00/T20:30:00": 3,
+                    "T20:30:00/T23:00:00": 2
+                }
+            },
+            "105": { "type": "off", "state": "Gallerie state" }
+        }
+    }
+]
+
 # Configuration for first kid's room
 CONFIG_KIND1 = [
     # Primary switch (Philips Tap)
     {
         "type": "switch",
         "name": "Julia switch",
-        "group": "Julia",
+        "group": "Julia oben",
         "bindings": {
             # on/off redirected to have only one implementation for switch and dimmer
             "tl": { "type": "redirect", "value": "51" },
@@ -566,7 +568,7 @@ CONFIG_KIND1 = [
     {
         "type": "switch",
         "name": "Julia dimmer",
-        "group": "Julia",
+        "group": "Julia oben",
         "bindings": {
             # on/off redirected to have only one implementation for switch and dimmer
             "on": { "type": "redirect", "value": "51" },
@@ -586,7 +588,7 @@ CONFIG_KIND1 = [
     {
         "type": "external",
         "name": "Julia",
-        "group": "Julia",
+        "group": "Julia oben",
         "state": "Julia state",
         "bindings": {
             "51": {
@@ -605,6 +607,7 @@ CONFIG_KIND1 = [
             "52": {
                 "type": "scene",
                 "stateUse": "secondary",
+                "group": "Julia",
                 "configs": [
                     {"scene": "off"},
                     # When in second state (night light), turn off after 20 minutes
@@ -925,11 +928,7 @@ if __name__ == '__main__':
     h.configure(CONFIG_DINING, "Esszimmer")
     h.configure(CONFIG_AZ, "Arbeitszimmer")
     h.configure(CONFIG_WC, "Gäste-WC")
-    h.configure(CONFIG_HW, "Flure")
-    h.configure(CONFIG_KIND1, "Julia")
-    h.configure(CONFIG_KIND2, "Katarina")
-    h.configure(CONFIG_B, "Schlafzimmer")
-    h.configure(CONFIG_BAD, "Badezimmer")
+    h.configure(CONFIG_HWEGUG, "Flure")
     h.configure(CONFIG_HWR, "HWR")
     h.configure(CONFIG_BASEMENT, "Keller")
     #h.configure(CONFIG_TEST, "Test")    # not yet working correctly
@@ -939,3 +938,16 @@ if __name__ == '__main__':
     #h.refresh()
     #h.findForeignData(config["otherKeys"])
     #h.listAll()
+
+    if "bridge2" in config:
+        # Example with second bridge to control further rooms
+        print("Processing second bridge")
+        h = HueBridge(config["bridge2"], config["apiKey2"])
+        h.configure(CONFIG_HWOG, "Gallerie")
+        h.configure(CONFIG_B, "Schlafzimmer")
+        h.configure(CONFIG_KIND1, "Julia")
+        h.configure(CONFIG_KIND2, "Katarina")
+        h.configure(CONFIG_BAD, "Badezimmer")
+        #h.refresh()
+        #h.findForeignData(config["otherKeys"])
+        #h.listAll()
