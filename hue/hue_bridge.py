@@ -1449,7 +1449,7 @@ class HueBridge():
             ]
         })
                 
-        # hanlding for state 3: light is dimmed
+        # handling for state 3: light is dimmed
         
         # rule(7): timer starts after entering state 3, after a timeout:
         #            if state is still 3, turn lights off and enter state -1 (off by sensor)

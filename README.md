@@ -251,9 +251,16 @@ a door contact is used, then additional 4 rules for handling door contact. I.e.,
 the configuration, up to 13 rules are used for a single motion sensor.
 
 It is also possible to use multiple motion sensors for a room. Add `sensors` parameter with the
-list of sensors to use. These sensors will be assigned to the group representing the room and
-group's presence and light state will be used instead of the single motion sensor named by `name`. 
+list of sensor names to use. These sensors will be assigned to the group representing the room and
+group's presence and light state will be used instead of the single motion sensor named by `name`.
 
+Note: if the motion sensor is disabled, then the rules won't trigger at all, including timeout
+after turning on the light. Reenabling the sensor reenables the rules. The only issue so far is
+a bug in Hue bridge which fails to process the no-presence rule if the light is already on and
+won't turn it off after a timeout. However, motion in front of the sensor or triggering any
+other rules for the sensor (e.g., manually turning off the light) will clean up the state and
+the sensor will work as expected.
+ 
 
 ## Action types
 
