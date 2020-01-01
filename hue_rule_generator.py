@@ -193,7 +193,7 @@ CONFIG_KITCHEN = [
                 "type": "scene",
                 # Instead of controlling all lights, only control the main light. The light
                 # under the cabinet is untouched.
-                "group": "Küche oben",
+                "group": "Küche Oberlicht",
                 # Note: we need to put state here, otherwise cabinet light toggle above would
                 # reset the state as well, which we don't want.
                 "state": "Küche state",
@@ -937,6 +937,9 @@ if __name__ == '__main__':
     # refresh configuration from the bridge and report any foreign rules
     #h.refresh()
     #h.findForeignData(config["otherKeys"])
+    #h.fixLightScenes(False) # fix light scenes to be normal group scenes where possible (except wakeup and co)
+    #h.fixSceneAppData(False) # fix appdata of scenes (if passed True) to properly display in the app
+    #h.findUnusedLightScenes(False) # find (and delete, if passed True) scenes, which are not used anymore
     #h.listAll()
 
     if "bridge2" in config:
@@ -950,4 +953,7 @@ if __name__ == '__main__':
         h.configure(CONFIG_BAD, "Badezimmer")
         #h.refresh()
         #h.findForeignData(config["otherKeys"])
+        #h.fixLightScenes(False) # fix light scenes to be normal group scenes where possible (except wakeup and co)
+        #h.fixSceneAppData(False) # fix appdata of scenes (if passed True) to properly display in the app
+        #h.findUnusedLightScenes(False) # find (and delete, if passed True) scenes, which are not used anymore
         #h.listAll()

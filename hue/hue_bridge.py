@@ -12,6 +12,7 @@ import pprint
 VAR_PATTERN = re.compile("\\${([^}:]+):([^}]+)}")
 SCENE_PATTERN = re.compile("^([^:]+):(.*)$")
 OFF_BINDING = { "type": "scene", "configs": [ {"scene": "off"} ] }
+MATCH_HUEAPP_SCENEDATA = re.compile('^(.....)_r([0-9][0-9])_d([0-9][0-9])$')
 
 BUTTON_MAP = {
     # mapping for dimmer
@@ -119,12 +120,17 @@ class HueBridge():
                 if not g:
                     print("Warning: missing group ID for scene '" + n + "', lights", lights, "(ignoring)")
                     continue
+                else:
+                    print("NOTE: Found group ID " + g + " for light scene " + n)
             else:
                 g = s["group"]
             if not g in self.__scenes_idx:
                 self.__scenes_idx[g] = {}
             if n in self.__scenes_idx[g]:
                 print("WARNING: Duplicate scene name '" + n + "' for group " + g + " ('" + self.__groups[g]["name"] + "'), IDs " + i + " and " + self.__scenes_idx[g][n])
+                if "group" in s:
+                    # prefer group scene
+                    self.__scenes_idx[g][n] = i
             else:
                 self.__scenes_idx[g][n] = i
         self.__rules = self.__all["rules"]
@@ -158,7 +164,8 @@ class HueBridge():
         else:
             print("Using external input sensor ", self.__extinput)
         for i in self.__scenes_idx:
-            print("Scenes for group", self.__groups[i]["name"] + ":", sorted(self.__scenes_idx[i].keys()))
+            mapper = lambda x : (x if "group" in self.__scenes[self.__scenes_idx[i][x]] else x + "*") + " @ " + self.__scenes_idx[i][x]
+            print("Scenes for group", self.__groups[i]["name"] + " (" + i + "):", [mapper(x) for x in sorted(self.__scenes_idx[i].keys())])
         print("Sensors:", sorted(self.__sensors_idx.keys()))
 
         self.__prepare()
@@ -226,6 +233,16 @@ class HueBridge():
                     index[n] = i
         return index
     
+    def __get(self, resource):
+        tmp = requests.get(self.urlbase + "/" + resource)
+        if tmp.status_code != 200:
+            raise Exception("Cannot read bridge data: status code " + str(tmp.status_code))
+        tmp.encoding = 'utf-8'
+        data = json.loads(tmp.text)
+        if type(data) is list and "error" in data[0].keys():
+            raise Exception("Cannot read bridge data: " + data[0]["error"]["description"])
+        return data
+
     def __deleteSensor(self, sensorID):
         name = self.__sensors[sensorID]["name"]
         tmp = requests.delete(self.urlbase + "/sensors/" + sensorID)
@@ -330,9 +347,9 @@ class HueBridge():
         print("Created schedule", scheduleID, name)
         return scheduleID
 
-    def __createScene(self, groupID, body):
+    def __createScene(self, groupID, body, recycle = True):
         sceneName = body["name"]
-        body["recycle"] = True
+        body["recycle"] = recycle
         lightstates = body["lightstates"]
         del body["lightstates"]
         r = requests.post(self.urlbase + "/scenes", json=body)
@@ -365,12 +382,37 @@ class HueBridge():
         print("Created scene", sceneID, sceneName, "for group", groupID)
         return sceneID
 
+    def __updateScene(self, sceneID, updates):
+        r = requests.put(self.urlbase + "/scenes/" + sceneID, json=updates)
+        sceneName = self.__scenes[sceneID]["name"]
+        if r.status_code != 200:
+            print("Data:", updates)
+            raise Exception("Cannot update scene '" + sceneName + "', text=" + r.text)
+        r.encoding = 'utf-8'
+        res = json.loads(r.text)
+        if not "success" in res[0]:
+            print("Data:", updates)
+            raise Exception("Cannot update scene '" + sceneName + "', error: " + r.text)
+
+        print("Updated scene", sceneID, sceneName)
+        for k, v in updates.items():
+            self.__scenes[sceneID][k] = v
+
     def __deleteScene(self, groupID, sceneID):
         name = self.__scene_idx[groupID][sceneID]["name"]
         tmp = requests.delete(self.urlbase + "/scenes/" + sceneID)
         if tmp.status_code != 200:
             raise Exception("Cannot delete scene " + sceneID + "/" + name + ": " + tmp.text)
         del self.__scene_idx[groupID][name]
+        del self.__scenes[sceneID]
+        print("Deleted scene", sceneID, name)
+
+    def __deleteSceneNoGID(self, sceneID):
+        name = self.__scenes[sceneID]["name"]
+        tmp = requests.delete(self.urlbase + "/scenes/" + sceneID)
+        if tmp.status_code != 200:
+            raise Exception("Cannot delete scene " + sceneID + "/" + name + ": " + tmp.text)
+        #del self.__scene_idx[groupID][name] -- NOTE: does not delete scene index
         del self.__scenes[sceneID]
         print("Deleted scene", sceneID, name)
 
@@ -2274,6 +2316,87 @@ class HueBridge():
             if desc["owner"][0:32] == self.apiKey[0:32]:
                 print(" - " + key + ": " + desc["name"])
 
+    def findUnusedLightScenes(self, doDelete = False):
+        # print all light scenes, which are unused by a rule/schedule
+        print("Light scenes:")
+        toDelete = []
+        for k in self.__scenes.keys():
+            s = self.__scenes[k]
+            if not "group" in s:
+                used = "" if s["locked"] else " UNUSED"
+                print("   - " + k + " (" + s["name"] + ")"  + used)
+                if doDelete and not s["locked"]:
+                    toDelete.append(k)
+
+        for k in toDelete:
+            self.__deleteSceneNoGID(k)
+
+    def fixLightScenes(self, apply = False):
+        # create normal group scenes counterparts for light scenes
+        print("Creating group scenes for light scenes:")
+        newScenes = []
+        for groupID in self.__scenes_idx.keys():
+            for sceneName in self.__scenes_idx[groupID]:
+                sceneID = self.__scenes_idx[groupID][sceneName]
+                s = self.__scenes[sceneID]
+                if not "group" in s:
+                    # this is a light scene, create also group scene
+                    if sceneName[0:7] == "Wake Up":
+                        print("   - ignoring wake up scene " + sceneName, sceneID)
+                        continue
+                    if s["recycle"]:
+                        print("   - ignoring recyclable scene " + sceneName, sceneID)
+                        continue
+                    print("   - creating group scene for", groupID, self.__groups[groupID]["name"], sceneID, sceneName)
+                    lightScene = self.__get("scenes/" + sceneID)
+                    newScenes.append(({
+                        "name": lightScene["name"], 
+                        "type": "GroupScene",
+                        "appdata": {"version": 1, "data": sceneID[0:5] + "_r" + (groupID if len(groupID) > 1 else "0" + groupID) + "_d99"},
+                        "recycle": False, 
+                        "group": groupID, 
+                        "lightstates": lightScene["lightstates"]}, groupID))
+        if apply:
+            for body, groupID in newScenes:
+                self.__createScene(groupID, body, False)
+                
+    def fixSceneAppData(self, apply = False):
+        # fix appdata for light scenes to be displayable in the app
+        print("Fixing app data of light scenes:")
+        sceneUpdates = {}
+        for groupID in self.__scenes_idx.keys():
+            gid = (groupID if len(groupID) > 1 else "0" + groupID)
+            for sceneName in self.__scenes_idx[groupID]:
+                sceneID = self.__scenes_idx[groupID][sceneName]
+                s = self.__scenes[sceneID]
+                if "group" in s:
+                    # this is a light scene, create also group scene
+                    if sceneName[0:7] == "Wake Up":
+                        print("   - ignoring wake up scene " + sceneName, sceneID)
+                        continue
+                    if s["recycle"]:
+                        print("   - ignoring recyclable scene " + sceneName, sceneID)
+                        continue
+                    a = s["appdata"]
+                    doUpdate = not "version" in a or not "data" in a
+                    data = None
+                    if not doUpdate and "version" in a and a["version"] == 1 and "data" in a:
+                        # check for invalid group ID
+                        match = MATCH_HUEAPP_SCENEDATA.match(a["data"])
+                        if match and match.group(2) != gid:
+                            doUpdate = True
+                            data = match.group(1) + "_r" + gid + "_d" + match.group(3)
+                    else:
+                        data = sceneID[0:5] + "_r" + gid + "_d99"
+
+                    if doUpdate:
+                        print("   - creating app data for group scene", groupID, sceneID, sceneName, data)
+                        sceneUpdates[sceneID] = {"appdata": {"version": 1, "data": data}}
+
+        if apply:            
+            for sceneID, update in sceneUpdates.items():
+                self.__updateScene(sceneID, update)
+                
     def listAll(self):
         # list all resorces
         print("Lights:")
