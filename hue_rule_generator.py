@@ -287,6 +287,7 @@ CONFIG_AZ = [
         "group": "Arbeitszimmer",
         "state": "Arbeitszimmer state",
         "bindings": {
+            # use right side of the switch for on/off action
             "33": {
                 "type": "scene",
                 "configs": [
@@ -301,7 +302,13 @@ CONFIG_AZ = [
             "34": {
                 "type": "scene",
                 "value": "off"
-            }
+            },
+            # use left side of the switch for dimming the light
+            # (hold to dim/brighten, release to stop)
+            "31": { "type": "dim", "value": 254, "tt": 35 },
+            "32": { "type": "dim", "value": -254, "tt": 35 },
+            "-31": { "type": "dim", "value": 0, "tt": 0 },
+            "-32": { "type": "dim", "value": 0, "tt": 0 }
         }
     },
     # Motion sensor to turn light on automatically.
