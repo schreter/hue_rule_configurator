@@ -350,8 +350,12 @@ class HueBridge():
     def __createScene(self, groupID, body, recycle = True):
         sceneName = body["name"]
         body["recycle"] = recycle
-        lightstates = body["lightstates"]
-        del body["lightstates"]
+        if "lightstates" in body:
+            lightstates = body["lightstates"]
+        else:
+            lightstates = None
+        if "lightstates" in body:
+            del body["lightstates"]
         r = requests.post(self.urlbase + "/scenes", json=body)
         if r.status_code != 200:
             print("Data:", body)
@@ -367,17 +371,18 @@ class HueBridge():
         if not groupID in self.__scenes_idx:
             self.__scenes_idx[groupID] = {}
         self.__scenes_idx[groupID][sceneName] = sceneID
-        for i in lightstates.keys():
-            state = lightstates[i]
-            r = requests.put(self.urlbase + "/scenes/" + sceneID + "/lights/" + str(i) + "/state", json=state)
-            if r.status_code != 200:
-                print("Data:", body)
-                raise Exception("Cannot set up light " + str(i) + " in scene '" + sceneName + "', text=" + r.text)
-            r.encoding = 'utf-8'
-            res = json.loads(r.text)
-            if not "success" in res[0]:
-                print("Data:", body)
-                raise Exception("Cannot set up light " + str(i) + " in scene '" + sceneName + "', error: " + r.text)
+        if lightstates:
+            for i in lightstates.keys():
+                state = lightstates[i]
+                r = requests.put(self.urlbase + "/scenes/" + sceneID + "/lights/" + str(i) + "/state", json=state)
+                if r.status_code != 200:
+                    print("Data:", body)
+                    raise Exception("Cannot set up light " + str(i) + " in scene '" + sceneName + "', text=" + r.text)
+                r.encoding = 'utf-8'
+                res = json.loads(r.text)
+                if not "success" in res[0]:
+                    print("Data:", body)
+                    raise Exception("Cannot set up light " + str(i) + " in scene '" + sceneName + "', error: " + r.text)
 
         print("Created scene", sceneID, sceneName, "for group", groupID)
         return sceneID
@@ -631,9 +636,16 @@ class HueBridge():
         multistate = len(configs) > 1
         if multistate and not "state" in state and not "times" in binding:
             raise Exception("Missing state configuration for a multistate config w/o times for " + name + "/" + ref)
+        # TODO ultimately, remove secondary state use, since not needed
         secondaryState = state["stateUse"] == "secondary";
 
+        # by default, if the group is off, consider it being state reset
+        useGroupOffForReset = True
+
         resetstateactions = []
+        group = state["group"]
+        groupID = self.__groups_idx[group]
+
         if "state" in state:
             resetstateactions = [
                 {
@@ -642,16 +654,41 @@ class HueBridge():
                     "body": { "status": 0 }
                 }
             ]
+            if "reset" in binding:
+                resetType = binding["reset"]
+                if not resetType in ["off", "group"]:
+                    raise Exception("Invalid reset type for multistate config " + name + "/" + ref + ", expected 'off' or 'group'")
+                if resetType == "off":
+                    # we have potentially an action for another switch, such as night light
+                    # reset the state when the group goes to off and use state to detect whether
+                    # turned on for the first time
+                    useGroupOffForReset = False
+                    # TODO once OR rules are possible, then use OR with state <= 0 to detect off state in action rules below
+                    self.__rulesToCreate.append(
+                        {
+                            "name": name + "/" + ref + "/grpoff",
+                            "conditions": [
+                                {
+                                    "address": "/groups/" + groupID + "/state/any_on",
+                                    "operator": "eq",
+                                    "value": "false"
+                                },
+                                {
+                                    "address": "/groups/" + groupID + "/state/any_on",
+                                    "operator": "dx"
+                                }
+                            ],
+                            "actions": resetstateactions
+                        }
+                    )
 
         toggleCond = []
         if "action" in binding:
             action = binding["action"]
             if action != "toggle":
-                raise Exception("Currently only toggle action is supported for scene " + name + "/" + ref)
+                raise Exception("Currently only 'toggle' action is supported for scene " + name + "/" + ref)
             
             # toggle action - only use the rules if the light is off
-            group = state["group"]
-            groupID = self.__groups_idx[group]
             toggleCond = [
                 {
                     "address": "/groups/" + groupID + "/state/any_on",
@@ -718,6 +755,13 @@ class HueBridge():
                             "value": str(-prevIndex if secondaryState else prevIndex)
                         }
                     ]
+                    if useGroupOffForReset:
+                        stateCond.append({
+                            "address": "/groups/" + groupID + "/state/any_on",
+                            "operator": "eq",
+                            "value": "true"
+                        })
+
                     stateAction = [
                         {
                             "address": "/sensors/${sensor:" + state["state"] + "}/state",
@@ -745,8 +789,14 @@ class HueBridge():
                         ]
                         stateAction = resetstateactions
                         if multistate and "state" in state:
-                            # only trigger if state not yet set
+                            # only trigger if light not yet on
                             stateCond += [
+                                {
+                                    "address": "/groups/" + groupID + "/state/any_on",
+                                    "operator": "eq",
+                                    "value": "false"
+                                }
+                            ] if useGroupOffForReset else [
                                 {
                                     "address": "/sensors/${sensor:" + state["state"] + "}/state/status",
                                     "operator": "gt" if secondaryState else "lt",
@@ -766,8 +816,14 @@ class HueBridge():
                     tidx = tidx + 1
             elif index == 0:
                 if multistate and "state" in state:
-                    # single rule to turn scene #0 if no state set
+                    # single rule to turn scene #0 if not on
                     stateCond = [
+                        {
+                            "address": "/groups/" + groupID + "/state/any_on",
+                            "operator": "eq",
+                            "value": "false"
+                        }
+                    ] if useGroupOffForReset else [
                         {
                             "address": "/sensors/${sensor:" + state["state"] + "}/state/status",
                             "operator": "gt" if secondaryState else "lt",
@@ -786,7 +842,21 @@ class HueBridge():
                     self.__singleSceneRules(config, cname + "/in", state, conditions + stateCond + toggleCond, actions + stateAction)
                 else:
                     # single config, no additional conditions
-                    self.__singleSceneRules(config, cname, state, conditions + toggleCond, resetstateactions + actions)
+                    stateactions = resetstateactions
+                    if "timeout" in binding:
+                        # there is a global timeout in binding, so we need to set state to nonzero
+                        if "state" in state:
+                            stateactions = [
+                                {
+                                    "address": "/sensors/${sensor:" + state["state"] + "}/state",
+                                    "method": "PUT",
+                                    "body": { "status": -1 }
+                                }
+                            ]
+                        else:
+                            print("WARNING: single-scene timeout on '" + name + "' will not be interrupted by changing light state by unrelated action, use state variable")
+                            stateactions = []
+                    self.__singleSceneRules(config, cname, state, conditions + toggleCond, stateactions + actions)
 
             if "timeout" in config:
                 # create extra rule to turn off light in this state
@@ -841,6 +911,56 @@ class HueBridge():
                 self.__rulesToCreate.append(rule)
 
             index = index + 1
+
+        if "timeout" in binding:
+            # global timeout for this binding, requires state being nonzero
+            timeout = "PT" + binding["timeout"]
+            cond = [{
+                "address": "/groups/" + groupID + "/state/any_on",
+                "operator": "eq",
+                "value": "true"
+            }]
+            act = resetstateactions + [
+                {
+                    "address": "/groups/" + groupID + "/action",
+                    "method": "PUT",
+                    "body": {
+                        "on": False
+                    }
+                }
+            ]
+            if "state" in state:
+                cond += [
+                    {
+                        "address": "/sensors/${sensor:" + state["state"] + "}/state/lastupdated",
+                        "operator": "ddx",
+                        "value": timeout
+                    }
+                ]
+                # we use -1 for state of a single-scene
+                self.__rulesToCreate.append({
+                    "name": cname + "/TO",
+                    "conditions": cond + [{
+                        "address": "/sensors/${sensor:" + state["state"] + "}/state/status",
+                        "operator": "lt",
+                        "value": "0"
+                    }],
+                    "actions": act
+                })
+            else:
+                rule = {
+                    "name": cname + "/TO",
+                    "conditions": cond + [
+                        {
+                            "address": "/groups/" + groupID + "/state/any_on",
+                            "operator": "ddx",
+                            "value": timeout
+                        }
+                    ],
+                    "actions": act
+                }
+                self.__rulesToCreate.append(rule)
+            
         
     def __lightRules(self, binding, name, ref, state, conditions, actions):
         """ Rules for switching a single light """

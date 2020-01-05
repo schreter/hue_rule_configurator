@@ -19,11 +19,7 @@ CONFIG_LR = [
     # State sensor for cycling scenes for the switch
     {
         "type": "state",
-        "name": "Wohnzimmer state",
-        # reset the state after small timeout, but only if lights are off
-        "timeout": "00:00:10@off",
-        # group is necessary to tell it which lights to check
-        "group": "Wohnzimmer"
+        "name": "Wohnzimmer state"
     },
     # Philips Tap switch (built into Eltako frame on the wall)
     {
@@ -58,13 +54,16 @@ CONFIG_LR = [
         "name": "Wohnzimmer switch",
         # Light group to manage (default for all bindings)
         "group": "Wohnzimmer",
+        # State to use for cycling scenes
+        "state": "Wohnzimmer state",
         "bindings": {
             # Action for switch on button
             "14": {
-                # State to use for cycling scenes
-                "state": "Wohnzimmer state",
                 # Use (multi)-scene action for this button
                 "type": "scene",
+                # force resetting state on off button
+                # (to start with the right scene even if nightligh is on)
+                "reset": "off",
                 # Scenes to cycle through when pushing on button several times
                 "configs": [
                     {"scene": "Talk"},
@@ -84,18 +83,10 @@ CONFIG_LR = [
             "12": [
                 # Note list of bindings to associate more than one action
                 {
-                    # State to use for cycling scenes
-                    "state": "Wohnzimmer state",
-                    # use negative states in the same state sensor for cycling scenes
-                    "stateUse": "secondary",
                     "type": "scene",
-                    "configs": [
-                        {"scene": "off"},
-                        {
-                            "scene": "Nacht",
-                            "timeout": "00:20:00"   # switch light off after 20 minutes
-                        }
-                    ]
+                    "action": "toggle",
+                    "value": "Nacht",
+                    "timeout": "00:20:00"   # switch light off after 20 minutes
                 },
                 # Second action, now at Christmas time to turn off light on the Christmas tree... :-)
                 {
@@ -187,6 +178,7 @@ CONFIG_KITCHEN = [
         "type": "external",
         "name": "Küche",
         "group": "Küche",
+        "state": "Küche state",
         "bindings": {
             # Kitchen binding from above to turn on light, based on time
             "29": {
@@ -194,9 +186,6 @@ CONFIG_KITCHEN = [
                 # Instead of controlling all lights, only control the main light. The light
                 # under the cabinet is untouched.
                 "group": "Küche Oberlicht",
-                # Note: we need to put state here, otherwise cabinet light toggle above would
-                # reset the state as well, which we don't want.
-                "state": "Küche state",
                 "configs": [
                     {"scene": "Tag"},
                     {"scene": "Concentrate"},
@@ -210,10 +199,9 @@ CONFIG_KITCHEN = [
             },
             # Extra action for one of buttons in the living room to turn off light in the kitchen
             "11": {
-                # Group specified for this binding only - all lights in the kitchen
+                # Turn off all lights in the kitchen
                 "group": "Küche",
-                "type": "off",
-                "state": "Küche state"
+                "type": "off"
             }
         }
     },
@@ -228,11 +216,12 @@ CONFIG_KITCHEN = [
         "bindings": {
             # On action redirects to the same action as the switch on button
             "on": { "type": "redirect", "value": "29" },
-            # Specify optional recover action to prevent the need for saving scene state
-            # on each dimming (and wearing off the lamps). We use default dim action here.
-            "recover": { "type": "redirect", "value": "29" },
+            # It is possible to specify an optional recover action to prevent the need for saving
+            # scene state on each dimming (and wearing off the lamps).
+            #"recover": { "type": "redirect", "value": "29" },
             # Off action turns off all lights in the kitchen, not only ceiling light
             "off": { "type": "redirect", "value": "11" }
+            # We use default dim action to dim by 50% here, so not specified.
         }
     }
 ]
@@ -255,13 +244,16 @@ CONFIG_DINING = [
             "71": {
                 "type": "scene",
                 "configs": [
+                    {"scene": "Tag"},
                     {"scene": "Concentrate"},
                     {"scene": "Tag"},
                     {"scene": "Abend"},
                     {"scene": "TV"}
                 ],
                 "times": {
-                    "T06:00:00/T21:00:00": 1,
+                    "T06:00:00/T09:00:00": 2,
+                    "T09:00:00/T17:00:00": 1,
+                    "T17:00:00/T21:00:00": 2,
                     "T21:00:00/T06:00:00": 3
                 }
             },
@@ -297,11 +289,16 @@ CONFIG_AZ = [
                 "times": {
                     "T06:00:00/T23:00:00": 2,
                     "T23:00:00/T06:00:00": 1
-                }
+                },
+                # force resetting state on off button
+                # (to start with the right scene even if nightligh is on)
+                "reset": "off"
             },
             "34": {
                 "type": "scene",
-                "value": "off"
+                "value": "Nightlight",
+                "timeout": "00:00:20",
+                "action": "toggle"
             },
             # use left side of the switch for dimming the light
             # (hold to dim/brighten, release to stop)
@@ -322,9 +319,10 @@ CONFIG_AZ = [
         "sensors": ["Arbeitszimmer sensor"], # could use more than one sensor here
         "bindings": {
             # Again, redirect via external input to have common code for switch and motion sensor.
-            "on": { "type": "redirect", "value": "33" },
-            # Use same action as "on" - shortcut to prevent duplicating the action
-            "recover": "on"
+            "on": { "type": "redirect", "value": "33" }
+            # Note: If we'd use explicit recover action, we could use same action as
+            # "on" - shortcut to prevent duplicating the action
+            #"recover": "on"
         }
     }
 ]
@@ -363,9 +361,7 @@ CONFIG_WC = [
         "closedtimeout": "00:20:00",
         "bindings": {
             # Again, redirect via external input to have common code for switch and motion sensor.
-            "on": { "type": "redirect", "value": "108" },
-            # Use same action as "on" - shortcut to prevent duplicating the action
-            "recover": "on"
+            "on": { "type": "redirect", "value": "108" }
         }
     },
     {
@@ -406,13 +402,13 @@ CONFIG_HWEGUG = [
     {
         "type": "motion",
         "name": "Flur sensor",
+        "sensors": ["Flur sensor", "Flur sensor 2"], # use two sensors in parallel
         "group": "Flur",
         "timeout": "00:02:00",
         "dimtime": "00:00:20",
         "state": "Flur state",
         "bindings": {
-            "on": { "type": "redirect", "value": "102" },
-            "recover": "on"
+            "on": { "type": "redirect", "value": "102" }
         }
     },
     {
@@ -453,8 +449,7 @@ CONFIG_HWEGUG = [
         "dimtime": "00:00:20",
         "state": "Kellerflur state",
         "bindings": {
-            "on": { "type": "redirect", "value": "106" },
-            "recover": "on"
+            "on": { "type": "redirect", "value": "106" }
         }
     },
     {
@@ -519,11 +514,10 @@ CONFIG_HWOG = [
                     {"scene": "dim", "value": -128}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 1,
+                    "T22:00:00/T06:00:00": 1,
                     "T06:00:00/T23:00:00": 2
                 }
-            },
-            "recover": "on"
+            }
         }
     },
     {
@@ -545,12 +539,25 @@ CONFIG_HWOG = [
                     {"scene": "Day"}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 1,
+                    "T22:00:00/T06:00:00": 1,
                     "T06:00:00/T20:30:00": 3,
-                    "T20:30:00/T23:00:00": 2
+                    "T20:30:00/T22:00:00": 2
                 }
             },
             "105": { "type": "off", "state": "Gallerie state" }
+        }
+    },
+
+    # Additional action for all-off button at the entrance.
+    {
+        "type": "external",
+        "name": "All off",
+        "bindings": {
+            "2": {
+                # Special group "All Lights" addresses as the name says all lights.
+                "group": "All Lights",
+                "type": "off"
+            }
         }
     }
 ]
@@ -601,6 +608,7 @@ CONFIG_KIND1 = [
             "51": {
                 "type": "scene",
                 "state": "Julia state",
+                "reset": "off",
                 "configs": [
                     {"scene": "Concentrate"},
                     {"scene": "Read"},
@@ -613,13 +621,12 @@ CONFIG_KIND1 = [
             },
             "52": {
                 "type": "scene",
-                "stateUse": "secondary",
+                # turn off *all* the lights, not just at the top
                 "group": "Julia",
-                "configs": [
-                    {"scene": "off"},
-                    # When in second state (night light), turn off after 20 minutes
-                    {"scene": "Nachtlicht", "timeout": "00:20:00"}
-                ]
+                # When in second state (night light), turn off after 20 minutes
+                "value": "Nachtlicht",
+                "timeout": "00:20:00",
+                "action": "toggle"
             }
         }
     }
@@ -658,6 +665,7 @@ CONFIG_KIND2 = [
             "42": {
                 "type": "scene",
                 "state": "Katarina state",
+                "reset": "off",
                 "configs": [
                     {"scene": "Hell"},
                     {"scene": "Lesen"},
@@ -670,11 +678,9 @@ CONFIG_KIND2 = [
             },
             "41": {
                 "type": "scene",
-                "stateUse": "secondary",
-                "configs": [
-                    {"scene": "off"},
-                    {"scene": "Nachtlicht", "timeout": "00:20:00"}
-                ]
+                "value": "Nachtlicht", 
+                "timeout": "00:20:00",
+                "action": "toggle"
             }
         }
     }
@@ -731,8 +737,10 @@ CONFIG_B = [
         "bindings": {
             "61": {
                 "type": "scene",
+                "reset": "off",
                 "configs": [
                     {"scene": "Concentrate"},
+                    {"scene": "Relax"},
                     {"scene": "Bright"},
                     {"scene": "Evening"},
                     {"scene": "Relax"},
@@ -740,17 +748,15 @@ CONFIG_B = [
                 ],
                 "times": {
                     "T06:00:00/T20:00:00": 1,
-                    "T20:00:00/T22:00:00": 3,
-                    "T22:00:00/T06:00:00": 4
+                    "T20:00:00/T22:00:00": 4,
+                    "T22:00:00/T06:00:00": 5
                 }
             },
             "62": {
                 "type": "scene",
-                "stateUse": "secondary",
-                "configs": [
-                    {"scene": "off"},
-                    {"scene": "Nightlight", "timeout": "00:20:00"}
-                ]
+                "value": "Nightlight", 
+                "timeout": "00:20:00",
+                "action": "toggle"
             }
         }
     }
@@ -810,8 +816,7 @@ CONFIG_BAD = [
         "contact": "Badezimmer contact",
         "bindings": {
             # Again, redirect via external input to have common code for switch and motion sensor.
-            "on": { "type": "redirect", "value": "65" },
-            "recover": "on"
+            "on": { "type": "redirect", "value": "65" }
         }
     },
     # on/off actions redirected from primary switch and motion sensor.
@@ -854,8 +859,7 @@ CONFIG_HWR = [
         "timeout": "00:03:00",
         "dimtime": "00:00:20",
         "bindings": {
-            "on": { "type": "redirect", "value": "112" },
-            "recover": "on"
+            "on": { "type": "redirect", "value": "112" }
         }
     },
     # on/off actions redirected from switch and motion sensor.
@@ -885,8 +889,7 @@ CONFIG_BASEMENT = [
         "timeout": "00:03:00",
         "dimtime": "00:00:15",
         "bindings": {
-            "on": { "type": "redirect", "value": "110" },
-            "recover": "on"
+            "on": { "type": "redirect", "value": "110" }
         }
     },
     # on/off actions redirected from switch and motion sensor.

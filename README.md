@@ -26,29 +26,13 @@ Example:
 {
     "type": "state",
     "name": "My state",
-    "timeout": "00:00:10@off",
     "group": "My group"	# only needed for @off timeout
 }
 ```
 
 State sensor is used to store the state of a switch. One state sensor can be used to store two
-states in parallel, e.g., for cycling through scenes on `on` button and cycling between off and
-nightlight scene on `off` button.
-
-If `timeout` is set, then the state sensor resets to 0 after this timeout (HH:MM:SS). Depending
-on use count, this will create one or two rules to reset the state after timeout. The timeout
-may be suffixed with `@off` to only reset the sensor if no lights are on. In that case, a check
-will be done whether any light is on in the group and the sensor will be reset only in case no
-light is on. This is typically the desired behavior (cycle scenes until switched off).
-
-Why use a timeout? Normally, when just using scene cycling, it is not important, since switching
-off will reset the sensor. But, if you have other special actions, like wake up timer, imagine
-switching off the light in the evening (which primes the switch for nightlight for the next
-"off" press), then being woken up in the morning. When you now switch off the light, it will
-actually turn on nightlight, since the switch is primed for it from the evening before. This
-can be counter-acted by setting a timeout, which is only active when the light is off. Thus,
-to set a night light, you turn off the lights, then press off button once again, which will
-activate the night light.
+states, e.g., positive for cycling through scenes on `on` button and negative for toggling between
+off and nightlight scene on `off` button.
 
 State virtual sensor creates one CLIP sensor and optionally one rule to reset the sensor.
 
@@ -109,15 +93,14 @@ Example:
             "times": {
                 "T07:00:00/T20:00:00": 2,   # day
                 "T20:00:00/T07:00:00": 1    # night
-            }
+            },
+            "reset": "off"
         },
         "12": {
             "type": "scene",
-            "stateUse": "secondary",
-            "configs": [
-                {"scene": "off"},
-                {"scene": "Nightlight", "timeout": "00:20:00"}
-            ]
+            "value": "Nightlight",
+            "timeout": "00:20:00",
+            "action": "toggle"
         }
     }
 }
@@ -132,9 +115,16 @@ External input uses CLIP state sensor named `ExternalInput`. If such a sensor do
 Since this particular example uses multi-state buttons, we need a state sensor to store the current
 state of the switch to detect multiple presses. You can see that for input `11`, we have three scenes
 and two time ranges. When no state is set, then the initial state is chosen based on the time range,
-otherwise first scene is used. For input `12`, we have again two scenes. To cycle through these two
-scenes, we again use state sensor, but this time the the secondary state (i.e., negative values).
-More on this in action types.
+otherwise first scene is used. For input `12`, we have a toggle scene. More on this in action types.
+This scene resets the state to negative value, so turning on the light will use proper time-based scene.
+
+In order to differentiate between light on and nightlight, an additional rule is needed to reset
+the sensor state when the light is turned off and to use sensor state instead of light group on state
+to detect that a first press of the button was done. This is indicated by using flag `"reset": "off"`
+for the binding of the on button (which normally uses light group on state to determine whether to
+trigger the initial action or follow-up action). Note: the additional rule to reset state is really
+needed in case when the light was turned off by the app or using a different action (e.g., all lights
+off). This is cheaper than adding additional rule per state to detect light off situation.
 
 Same as for switch sensor, each binding creates by default one rule, except multi-scene and toggle
 bindings (see later).
@@ -220,13 +210,20 @@ optional, if not specified, the lights won't be turned on automatically (just tu
 
 Additionally, it's possible to specify bindings for `dim` and `recover`, which are called on
 no motion timeout to dim the lights and to recover light states if motion is detected in the
-dimmed state. They by default dim the light by 50% and recover state before dimming. However,
-this wears off the lamps, so it's better to specify at least `recover` binding, typically to
-the same action as `on` action (this can be shortened by specifying string `"on"` as the
-action). If `recover` action is specified, then `dim` action will not save light state.
+dimmed state. They by default dim the light by 50% and recover state before dimming. Storing
+the light state may wear off the flash memory in lamps quicker, so it's possible to specify
+`recover` binding, typically to the same action as `on` action (this can be shortened by specifying
+string `"on"` as the action). If `recover` action is specified, then `dim` action will not save
+light state. However, since most users will use "recover after power failure" mode for light
+bulbs, the state is saved anyway, so there will most likely be no difference in Flash memory
+wear when using additional scene to store light state before dimming.
 
-If the optional `state` is present, then the sensor with this name will be reset before
+If the optional `state` is present, then the switch state sensor with this name will be reset before
 turning light on or off.
+
+Note: if using `on` action for `recover`, you need to pay attention to use `"reset": "off"` flag
+for your multi-state scene action for `on`, since otherwise the action will do nothing - the
+light is on from the point of view of the on rules.
 
 Optionally, a contact sensor defined in the same configuration can be addressed using `contact`
 parameter. When there is no motion detected shortly after closing the door, the light is turned
@@ -285,6 +282,7 @@ Example:
 {
     "type": "switch",
     "state": "My state",
+    "reset": "off",
     "name": "My switch",
     "group": "My room",
     "bindings": {
@@ -302,11 +300,9 @@ Example:
         },
         "1": {
             "type": "scene",
-            "stateUse": "secondary",
-            "configs": [
-                {"scene": "off"},
-                {"scene": "Nightlight", "timeout": "00:20:00"}
-            ]
+            "value": "Nightlight",
+            "timeout": "00:20:00",
+            "action": "toggle"
         }
     }
 }
@@ -404,6 +400,8 @@ Light action defines one of the actions for a single light:
 - `on` - turn the light on
 - `off` - turn the light off
 - `toggle` - toggle the state of the light (see example)
+
+Currently, there is no possibility to specify the light color or intensity when turning it on.
 
 On and off actions create one rule, toggle action creates two rules.
 
@@ -515,11 +513,9 @@ CONFIG_LR = [
             },
             "12": {
                 "type": "scene",
-                "stateUse": "secondary",
-                "configs": [
-                    {"scene": "off"},
-                    {"scene": "Night", "timeout": "00:20:00"}
-                ]
+                "value": "Night",
+                "timeout": "00:20:00",
+                "action": "toggle"
             },
             # additional action to turn off kitchen light from the living room
             "11": {
