@@ -399,11 +399,15 @@ class HueBridge():
             self.__scenes[sceneID][k] = v
 
     def __deleteScene(self, groupID, sceneID):
-        name = self.__scene_idx[groupID][sceneID]["name"]
+        name = None
+        for n in self.__scenes_idx[groupID].keys():
+            if self.__scenes_idx[groupID][n] == sceneID:
+                name = n
+                break
         tmp = requests.delete(self.urlbase + "/scenes/" + sceneID)
         if tmp.status_code != 200:
             raise Exception("Cannot delete scene " + sceneID + "/" + name + ": " + tmp.text)
-        del self.__scene_idx[groupID][name]
+        del self.__scenes_idx[groupID][name]
         del self.__scenes[sceneID]
         print("Deleted scene", sceneID, name)
 
@@ -412,7 +416,7 @@ class HueBridge():
         tmp = requests.delete(self.urlbase + "/scenes/" + sceneID)
         if tmp.status_code != 200:
             raise Exception("Cannot delete scene " + sceneID + "/" + name + ": " + tmp.text)
-        #del self.__scene_idx[groupID][name] -- NOTE: does not delete scene index
+        #del self.__scenes_idx[groupID][name] -- NOTE: does not delete scene index
         del self.__scenes[sceneID]
         print("Deleted scene", sceneID, name)
 
@@ -2196,7 +2200,7 @@ class HueBridge():
         # delete scenes
         for gid in self.__scenesToDelete.keys():
             for i in self.__scenesToDelete[gid]:
-                sceneID = self.__deleteScene(gid, self.__scenesToDelete[gid][i])
+                sceneID = self.__deleteScene(gid, i)
 
         if self.__linkToDelete:
             print("Resource link to delete:", self.__linkToDelete)
