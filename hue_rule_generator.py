@@ -245,16 +245,19 @@ CONFIG_DINING = [
                 "type": "scene",
                 "configs": [
                     {"scene": "Tag"},
+                    {"scene": "Oben"},
                     {"scene": "Concentrate"},
                     {"scene": "Tag"},
+                    {"scene": "Oben"},
                     {"scene": "Abend"},
-                    {"scene": "TV"}
+                    {"scene": "TV"},
+                    {"scene": "Oben"}
                 ],
                 "times": {
-                    "T06:00:00/T09:00:00": 2,
+                    "T06:00:00/T09:00:00": 3,
                     "T09:00:00/T17:00:00": 1,
-                    "T17:00:00/T21:00:00": 2,
-                    "T21:00:00/T06:00:00": 3
+                    "T17:00:00/T21:00:00": 3,
+                    "T21:00:00/T06:00:00": 6
                 }
             },
             # Turn off the light above dining table
@@ -433,7 +436,8 @@ CONFIG_HWEGUG = [
                     "T23:00:00/T06:00:00": 1,
                     "T06:00:00/T18:00:00": 3,
                     "T18:00:00/T23:00:00": 2,
-                }
+                },
+                "reset": "off"
             },
             "103": { "type": "off", "state": "Flur state" },
             "130": { "type": "off", "group": "UG" },
@@ -515,7 +519,9 @@ CONFIG_HWOG = [
                 ],
                 "times": {
                     "T22:00:00/T06:00:00": 1,
-                    "T06:00:00/T23:00:00": 2
+                    "W003/T06:00:00/T08:30:00": 1,
+                    "W124/T06:00:00/T08:30:00": 2,
+                    "T08:30:00/T22:00:00": 2
                 }
             }
         }
@@ -540,7 +546,9 @@ CONFIG_HWOG = [
                 ],
                 "times": {
                     "T22:00:00/T06:00:00": 1,
-                    "T06:00:00/T20:30:00": 3,
+                    "W003/T06:00:00/T08:30:00": 1, # on weekends, only turn on full light starting 8:30
+                    "W124/T06:00:00/T08:30:00": 3, # on weekdays, use full light starting 6:00
+                    "T08:30:00/T20:30:00": 3,
                     "T20:30:00/T22:00:00": 2
                 }
             },
@@ -838,8 +846,11 @@ CONFIG_BAD = [
                 "times": {
                     "T21:00:00/T00:00:00": 4,
                     "T00:00:00/T06:00:00": 3,
-                    "T06:00:00/T07:00:00": 4,
-                    "T07:00:00/T21:00:00": 1
+                    "W124/T06:00:00/T06:30:00": 4, # on weekdays, use dimmed light between 6:00 and 6:30 and full light from 6:30 on
+                    "W124/T06:30:00/T08:30:00": 1,
+                    "W003/T06:00:00/T07:30:00": 3, # on weekends, use night light until 7:30 and dimmed light between 7:30 and 8:30
+                    "W003/T07:30:00/T08:30:00": 4,
+                    "T08:30:00/T21:00:00": 1       # always full light from 8:30 on
                 }
             },
             "66": {
