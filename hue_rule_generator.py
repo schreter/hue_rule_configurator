@@ -170,6 +170,31 @@ CONFIG_KITCHEN = [
                 "group": "Küche Unterlicht",    # group to manage
                 "value": "Concentrate",         # scene to set
                 "action": "toggle"              # toggle between on/off states only (single config)
+            },
+            "on-hold": {
+                "type": "scene",                # group action 
+                "group": "Küche Spüle",         # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
+            }
+        }
+    },
+    # Smart button to turn on/off the light above the sink
+    {
+        "type": "switch",
+        "name": "Küche Spüle",
+        "bindings": {
+            "on": {
+                "type": "scene",                # group action 
+                "group": "Küche Spüle",         # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
+            },
+            "on-hold": {
+                "type": "scene",                # group action 
+                "group": "Küche Unterlicht",    # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
             }
         }
     },
@@ -189,12 +214,15 @@ CONFIG_KITCHEN = [
                 "configs": [
                     {"scene": "Tag"},
                     {"scene": "Concentrate"},
+                    {"scene": "Night"},
                     {"scene": "Abend"}
                 ],
                 "times": {
                     "T06:00:00/T18:00:00": 2,
                     "T18:00:00/T21:30:00": 1,
-                    "T21:30:00/T06:00:00": 3
+                    "T21:30:00/T00:30:00": 4,
+                    "T00:30:00/T05:00:00": 3,
+                    "T05:00:00/T06:00:00": 4
                 }
             },
             # Extra action for one of buttons in the living room to turn off light in the kitchen
@@ -209,7 +237,7 @@ CONFIG_KITCHEN = [
     {
         "type": "motion",
         "name": "Küche sensor",     # motion sensor name as defined in Philips app
-        "group": "Küche Oberlicht", # group to control (only ceiling light)
+        "group": "Küche",           # group to control
         "timeout": "00:03:00",      # timeout after no motion detected to dim the light
         "dimtime": "00:00:20",      # timeout to turn off lights after dimming
         "state": "Küche state",     # switch state sensor to reset to activate default action
@@ -381,11 +409,14 @@ CONFIG_WC = [
                 "type": "scene",
                 "configs": [
                     { "scene": "Concentrate"},
+                    { "scene": "Nightlight"},
                     { "scene": "Bright"}
                 ],
                 "times": {
                     "T06:00:00/T23:00:00": 1,
-                    "T23:00:00/T06:00:00": 2
+                    "T23:00:00/T00:30:00": 3,
+                    "T00:30:00/T05:00:00": 2,
+                    "T05:00:00/T06:00:00": 3
                 }
             },
             "109": { "type": "off" }
@@ -428,13 +459,16 @@ CONFIG_HWEGUG = [
                 "type": "scene",
                 "state": "Flur state",
                 "configs": [
-                    {"scene": "Night"},
+                    {"scene": "Day"},
                     {"scene": "Evening"},
-                    {"scene": "Day"}
+                    {"scene": "Nightlight"},
+                    {"scene": "Night"}
                 ],
                 "times": {
-                    "T23:00:00/T06:00:00": 1,
-                    "T06:00:00/T18:00:00": 3,
+                    "T23:00:00/T00:30:00": 4,
+                    "T00:30:00/T05:00:00": 3,
+                    "T05:00:00/T06:00:00": 4,
+                    "T06:00:00/T18:00:00": 1,
                     "T18:00:00/T23:00:00": 2,
                 },
                 "reset": "off"
@@ -920,6 +954,69 @@ CONFIG_BASEMENT = [
     }
 ]
 
+# Configuration for room in basement
+CONFIG_HOBBY = [
+    # Switch (Philips Dimmer)
+    {
+        "type": "switch",
+        "name": "Hobbyraum switch",
+        "group": "Hobbyraum",
+        "bindings": {
+            "on": { "type": "redirect", "value": "121" },
+            "off": { "type": "redirect", "value": "122" },
+            **HueBridge.DIMMER_RULES
+        }
+    },
+    # Motion sensor in this room to turn light on/off
+    {
+        "type": "motion",
+        "name": "Hobbyraum sensor",
+        "group": "Hobbyraum",
+        "timeout": "00:03:00",
+        "dimtime": "00:00:20",
+        "bindings": {
+            "on": { "type": "redirect", "value": "121" }
+        }
+    },
+    {
+        "type": "state",
+        "name": "Hobbyraum state",
+        "timeout": "00:00:10@off",
+        "group": "Hobbyraum"
+    },
+    # on/off actions redirected from switch and motion sensor.
+    {
+        "type": "external",
+        "name": "Hobbyraum",
+        "group": "Hobbyraum",
+        "state": "Hobbyraum state",
+        "bindings": {
+            "121": {
+                "type": "scene",
+                "reset": "off",
+                "configs": [
+                    {"scene": "Concentrate"},
+                    {"scene": "Bright"},
+                    {"scene": "Relax"},
+                    {"scene": "Read"},
+                    {"scene": "Relax"}
+                ],
+                "times": {
+                    "T06:00:00/T20:00:00": 1,
+                    "T20:00:00/T22:00:00": 4,
+                    "T22:00:00/T06:00:00": 5
+                }
+            },
+            "122": {
+                "type": "scene",
+                "value": "Nightlight", 
+                "timeout": "00:20:00",
+                "action": "toggle"
+            }
+        }
+    }
+]
+
 # Test config for wake up (not yet working correctly)
 CONFIG_TEST = [
     {
@@ -952,6 +1049,7 @@ if __name__ == '__main__':
     h.configure(CONFIG_HWEGUG, "Flure")
     h.configure(CONFIG_HWR, "HWR")
     h.configure(CONFIG_BASEMENT, "Keller")
+    h.configure(CONFIG_HOBBY, "Hobbyraum")
     #h.configure(CONFIG_TEST, "Test")    # not yet working correctly
     #h.configure(CONFIG_BOOT, "Boot")    # not yet working correctly
 
