@@ -1847,15 +1847,15 @@ class HueBridge():
             # If no motion has been detected after door is closed, then turn off light.
             #
             # The sensor sends a no-presence signal after 10 seconds of no-presence detection.
-            # So check after 11 seconds after closing doors whether there is presence or not.
+            # So check after 12 seconds after closing doors whether there is presence or not.
 
             contactName = desc["contact"]
 
             # when door contact goes to closed:
 
-            # rule(12): check after a 16s timeout:
+            # rule(12): check after a 12s timeout:
             #    if no motion is detected and state is still 3 turn lights off and keep state 3
-            closedchecktime = "PT00:00:16"
+            closedchecktime = "PT00:00:12"
             if "closedchecktime" in desc:
                 closedchecktime = "PT" + desc["closedchecktime"]
             actions = []
