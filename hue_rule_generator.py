@@ -344,7 +344,7 @@ CONFIG_AZ = [
         "type": "motion",
         "name": "Arbeitszimmer sensor",
         "group": "Arbeitszimmer",
-        "timeout": "00:03:00",
+        "timeout": "00:05:00",
         "dimtime": "00:00:15",
         "state": "Arbeitszimmer state",
         "sensors": ["Arbeitszimmer sensor"], # could use more than one sensor here
@@ -632,6 +632,34 @@ CONFIG_KIND1 = [
             # This is a special binding to install standard dimmer rules for
             # continuous dimming down and up using brightness buttons.
             **HueBridge.DIMMER_RULES
+        }
+    },
+    # Contact sensor (external one), to detect whether the door is open or closed.
+    {
+        "type": "contact",
+        "name": "Julia door contact",
+        "bindings": {
+            "open": "1020",
+            "closed": "1021"
+        } 
+    },
+    # Motion sensor to turn light off automatically.
+    {
+        "type": "motion",
+        "name": "Julia sensor",
+        "group": "Julia",
+        "timeout": "00:02:45",
+        "dimtime": "00:00:15",
+        "state": "Julia state",
+        # Cooperate with the contact to prevent turning lights off when door is closed and
+        # someone is inside. Similarly, if there is no motion whatsoever after
+        # closing the door, turn lights off shortly after.
+        "contact": "Julia door contact",
+        # Force timeout even on closed door contact after 20 minutes. This is a safety net
+        # if the contact breaks. Any motion within this time period will reset the timer.
+        "closedtimeout": "00:20:00",
+        "bindings": {
+            # no bindings, just turn the light off after timeout
         }
     },
     {
