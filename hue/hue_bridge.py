@@ -779,7 +779,11 @@ class HueBridge():
                 tidx = 1
                 for timerange in times:
                     # time indices are 1-based, therefore add 1
-                    if times[timerange] == index + 1:
+                    spec = times[timerange]
+                    specIndex = spec
+                    if type(spec) is dict:
+                        specIndex = spec["index"]
+                    if specIndex == index + 1:
                         stateCond = [
                             {
                                 "address": "/config/localtime",
@@ -787,6 +791,20 @@ class HueBridge():
                                 "value": timerange
                             }
                         ]
+                        if type(spec) is dict:
+                            # add additional condition checking for the flag
+                            flag = spec["flag"]
+                            value = spec["value"]
+                            operator = "eq"
+                            if "operator" in spec:
+                                operator = spec["operator"]
+                            stateCond += [
+                                {
+                                    "address": "/sensors/${sensor:" + flag + "}/state/flag",
+                                    "operator": operator,
+                                    "value": "true" if value else "false"
+                                }
+                            ]
                         stateAction = resetstateactions
                         if multistate and "state" in state:
                             # only trigger if light not yet on

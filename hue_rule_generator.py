@@ -580,8 +580,11 @@ CONFIG_HWOG = [
                 ],
                 "times": {
                     "T22:00:00/T06:00:00": 1,
-                    "W003/T06:00:00/T08:30:00": 1, # on weekends, only turn on full light starting 8:30
-                    "W124/T06:00:00/T08:30:00": 3, # on weekdays, use full light starting 6:00
+                    # on weekends and vacations, only turn on full light starting 8:30
+                    "W003/T06:00:00/T08:30:00": 1,
+                    "W124/T06:00:00/T08:30:00*1": {"index": 1, "flag": "Vacation", "value": True},
+                    # on weekdays, turn on full light starting 6:00
+                    "W124/T06:00:00/T08:30:00*2": {"index": 3, "flag": "Vacation", "value": False},
                     "T08:30:00/T20:30:00": 3,
                     "T20:30:00/T22:00:00": 2
                 }
@@ -908,11 +911,16 @@ CONFIG_BAD = [
                 "times": {
                     "T21:00:00/T00:00:00": 4,
                     "T00:00:00/T06:00:00": 3,
-                    "W124/T06:00:00/T06:30:00": 4, # on weekdays, use dimmed light between 6:00 and 6:30 and full light from 6:30 on
-                    "W124/T06:30:00/T08:30:00": 1,
-                    "W003/T06:00:00/T07:30:00": 3, # on weekends, use night light until 7:30 and dimmed light between 7:30 and 8:30
+                    # on weekdays, use dimmed light between 6:00 and 6:30 and full light from 6:30 on
+                    "W124/T06:00:00/T06:30:00": {"index": 4, "flag": "Vacation", "value": False},
+                    "W124/T06:30:00/T08:30:00": {"index": 1, "flag": "Vacation", "value": False},
+                    # on weekends and vacations, use night light until 7:30 and dimmed light between 7:30 and 8:30
+                    "W003/T06:00:00/T07:30:00": 3,
                     "W003/T07:30:00/T08:30:00": 4,
-                    "T08:30:00/T21:00:00": 1       # always full light from 8:30 on
+                    "W124/T06:00:00/T07:30:00": {"index": 3, "flag": "Vacation", "value": True},
+                    "W124/T07:30:00/T08:30:00": {"index": 4, "flag": "Vacation", "value": True},
+                    # always full light from 8:30 on
+                    "T08:30:00/T21:00:00": 1
                 }
             },
             "66": {

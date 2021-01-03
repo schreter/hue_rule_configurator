@@ -325,7 +325,14 @@ should just turn lights off, you can also use action type `off` instead.
 If an optional `times` parameter is specified, then instead of starting with the first scene,
 the current time is compared against specified intervals and the scene at the associated index
 is recalled (1-based, i.e., `Night` scene in the above example has index 1). If there is no
-time range for the current time, then no action is triggered.
+time range for the current time, then no action is triggered. Instead of a single index parameter,
+also a structure with `index`, `flag` and `value` can be passed, which will evaluate the Boolean
+CLIP flag sensor named by the parameter `flag` and match it against the Boolean value specified
+in parameter `value` (and only enable the time range if the value matches). This can be used
+to add additional, externally-controlled flags, such as vacation flag, to fine-tune the times
+based on user-specific conditions. Note: Since the time range might now have duplicate values,
+just add "*<number>" at the end of the time range to discern multiple configurations for the
+same time range with different flag values.
 
 Additional `timeout` parameter can be specified for a configuration of the scene to turn off lights
 after the specified timeout (unless another action was triggered).
