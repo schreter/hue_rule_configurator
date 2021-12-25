@@ -475,51 +475,57 @@ class HueBridge():
             self.__rulesToCreate.append(ruleData)
 
     def __rulesForContact(self, v):
-        """ Create rules for contact sensor """
-        bindings = v["bindings"]
-        openID = bindings["open"]
-        closedID = bindings["closed"]
-        name = v["name"]
-        rules = []
-        for i in [["open", openID, 0], ["closed", closedID, 1]]:
-            ruleData = {
-                "name": name + '/' + i[0],
-                "status": "enabled",
-                "conditions": [
-                    {
-                        "address": "/sensors/${sensor:" + name + "}/state/status",
-                        "operator": "eq",
-                        "value": str(1 - i[2])
-                    },
-                    {
-                        "address": "/sensors/" + self.__extinput + "/state/status",
-                        "operator": "eq",
-                        "value": i[1]
-                    },
-                    {
-                        "address": "/sensors/" + self.__extinput + "/state/lastupdated",
-                        "operator": "dx",
-                    }
-                ],
-                "actions": [
-                    {
-                        "address": "/sensors/${sensor:" + name + "}/state",
-                        "method": "PUT",
-                        "body": {
-                            "status": i[2]
+        """ Create rules for contact sensor, if bindings are specified """
+        if "bindings" in v:
+            bindings = v["bindings"]
+            source = []
+            if "open" in bindings:
+                openID = bindings["open"]
+                source.append(["open", openID, False])
+            if "closed" in bindings:
+                closedID = bindings["closed"]
+                source.append(["closed", closedID, True])
+            name = v["name"]
+            rules = []
+            for i in source:
+                ruleData = {
+                    "name": name + '/' + i[0],
+                    "status": "enabled",
+                    "conditions": [
+                        {
+                            "address": "/sensors/${sensor:" + name + "}/state/status",
+                            "operator": "eq",
+                            "flag": not i[2]
+                        },
+                        {
+                            "address": "/sensors/" + self.__extinput + "/state/status",
+                            "operator": "eq",
+                            "value": i[1]
+                        },
+                        {
+                            "address": "/sensors/" + self.__extinput + "/state/lastupdated",
+                            "operator": "dx",
                         }
-                    },
-                    {
-                        "address": "/sensors/" + self.__extinput + "/state",
-                        "method": "PUT",
-                        "body": {
-                            "status": 1
+                    ],
+                    "actions": [
+                        {
+                            "address": "/sensors/${sensor:" + name + "}/state",
+                            "method": "PUT",
+                            "body": {
+                                "flag": i[2]
+                            }
+                        },
+                        {
+                            "address": "/sensors/" + self.__extinput + "/state",
+                            "method": "PUT",
+                            "body": {
+                                "status": 1
+                            }
                         }
-                    }
-                ]
-            }
-            rules.append(ruleData)
-        self.__rulesToCreate += rules
+                    ]
+                }
+                rules.append(ruleData)
+            self.__rulesToCreate += rules
 
     def __replaceVariable(self, match):
         tp = match.group(1)
@@ -784,6 +790,8 @@ class HueBridge():
                     if type(spec) is dict:
                         specIndex = spec["index"]
                     if specIndex == index + 1:
+                        # strip *<number> at the end to differentiate same-range entries
+                        timerange = re.sub("\\*[0-9]+$", "", timerange)
                         stateCond = [
                             {
                                 "address": "/config/localtime",
@@ -1375,15 +1383,15 @@ class HueBridge():
             contactName = desc["contact"]
             contactOpenCond = [
                 {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
+                    "address": "/sensors/${sensor:" + contactName + "}/state/flag",
                     "operator": "eq",
-                    "value": "0"
+                    "value": "false"
                 }]
             contactClosedCond = [
                 {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
+                    "address": "/sensors/${sensor:" + contactName + "}/state/flag",
                     "operator": "eq",
-                    "value": "1"
+                    "value": "true"
                 }]
 
 
@@ -1889,9 +1897,9 @@ class HueBridge():
                     "value": "0"
                 },
                 {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
+                    "address": "/sensors/${sensor:" + contactName + "}/state/flag",
                     "operator": "eq",
-                    "value": "1"
+                    "value": "true"
                 },
                 {
                     "address": "/sensors/${sensor:" + contactName + "}/state/lastupdated",
@@ -1935,7 +1943,7 @@ class HueBridge():
                         "address": "/sensors/${sensor:" + contactName + "}/state",
                         "method": "PUT",
                         "body": {
-                            "status": 1,
+                            "flag": True,
                         }
                     },
                 ]
@@ -1953,12 +1961,12 @@ class HueBridge():
             ]
             conditions = [
                 {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
+                    "address": "/sensors/${sensor:" + contactName + "}/state/flag",
                     "operator": "eq",
-                    "value": "0"
+                    "value": "false"
                 },
                 {
-                    "address": "/sensors/${sensor:" + contactName + "}/state/status",
+                    "address": "/sensors/${sensor:" + contactName + "}/state/flag",
                     "operator": "dx"
                 }
             ]
@@ -2031,12 +2039,13 @@ class HueBridge():
                     # call recursively for sub-dicts
                     self.__updateReferences(value)
 
-    def __prepareSensor(self, v, wakeup = False):
+    def __prepareSensor(self, v, flag_only = False):
         name = v["name"]
         s = self.findSensor(name)
         if s:
-            if self.__sensors[s]["type"] != ("CLIPGenericFlag" if wakeup else "CLIPGenericStatus"):
-                raise Exception("Sensor '" + name + "' is not a generic status sensor")
+            sensor_type = self.__sensors[s]["type"]
+            if sensor_type != "CLIPGenericFlag" and sensor_type != "CLIPGenericStatus":
+                raise Exception("Sensor '" + name + "' is not a generic status sensor, found " + sensor_type)
             self.__sensorsToDelete.append(s)
             self.__rulesToDelete += self.findRulesForSensorID(s)
         sensorData = {
@@ -2054,7 +2063,7 @@ class HueBridge():
             "swversion": "1.0",
             "uniqueid": name
         }
-        if wakeup:
+        if flag_only:
             sensorData["type"] = "CLIPGenericFlag"
             sensorData["modelid"] = "WAKEUP"
             sensorData["swversion"] = "A_1801260942"
@@ -2301,8 +2310,10 @@ class HueBridge():
                     self.__rulesForSwitch(v)
                 elif tp == "external":
                     self.__rulesForExternal(v)
-                elif tp == "state"  or tp == "contact":
+                elif tp == "state":
                     self.__prepareSensor(v)
+                elif tp == "contact":
+                    self.__prepareSensor(v, True)
                 elif tp == "motion":
                     self.__rulesForMotion(v)
                 elif tp == "wakeup":

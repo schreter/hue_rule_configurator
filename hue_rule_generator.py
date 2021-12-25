@@ -315,10 +315,13 @@ CONFIG_AZ = [
                 "type": "scene",
                 "configs": [
                     {"scene": "Bright"},
+                    {"scene": "Day"},
                     {"scene": "Concentrate"}
                 ],
                 "times": {
-                    "T06:00:00/T23:00:00": 2,
+                    "T06:00:00/T07:45:00": 3,
+                    "T07:45:00/T20:00:00": 2,
+                    "T20:00:00/T23:00:00": 3,
                     "T23:00:00/T06:00:00": 1
                 },
                 # force resetting state on off button
@@ -720,6 +723,30 @@ CONFIG_KIND2 = [
             # remaining buttons used to dim up and down from the primary switch
             "tr": { "type": "dim", "value": 50, "tt": 5 },
             "br": { "type": "dim", "value": -50, "tt": 5 }
+        }
+    },
+    # Contact sensor (driven directly by OpenHAB), to detect whether the door is open or closed.
+    {
+        "type": "contact",
+        "name": "Katarina door contact"
+    },
+    # Motion sensor to turn light off automatically.
+    {
+        "type": "motion",
+        "name": "Katarina sensor",
+        "group": "Katarina",
+        "timeout": "00:02:45",
+        "dimtime": "00:00:15",
+        "state": "Katarina state",
+        # Cooperate with the contact to prevent turning lights off when door is closed and
+        # someone is inside. Similarly, if there is no motion whatsoever after
+        # closing the door, turn lights off shortly after.
+        "contact": "Katarina door contact",
+        # Force timeout even on closed door contact after 20 minutes. This is a safety net
+        # if the contact breaks. Any motion within this time period will reset the timer.
+        "closedtimeout": "00:20:00",
+        "bindings": {
+            # no bindings, just turn the light off after timeout
         }
     },
     {
