@@ -62,7 +62,7 @@ CONFIG_LR = [
                 # Use (multi)-scene action for this button
                 "type": "scene",
                 # force resetting state on off button
-                # (to start with the right scene even if nightligh is on)
+                # (to start with the right scene even if nightlight is on)
                 "reset": "off",
                 # Scenes to cycle through when pushing on button several times
                 "configs": [
@@ -303,6 +303,11 @@ CONFIG_AZ = [
         "type": "state",
         "name": "Arbeitszimmer state"
     },
+    # Contact sensor (driven directly by OpenHAB), to detect whether the door is open or closed.
+    {
+        "type": "contact",
+        "name": "Arbeitszimmer door contact"
+    },
     # We use only external switch here, generating actions 33 and 34 for on/off buttons
     {
         "type": "external",
@@ -350,6 +355,7 @@ CONFIG_AZ = [
         "timeout": "00:05:00",
         "dimtime": "00:00:15",
         "state": "Arbeitszimmer state",
+        "contact": "Arbeitszimmer door contact",
         "sensors": ["Arbeitszimmer sensor"], # could use more than one sensor here
         "bindings": {
             # Again, redirect via external input to have common code for switch and motion sensor.

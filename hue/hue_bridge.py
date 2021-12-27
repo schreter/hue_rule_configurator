@@ -177,6 +177,7 @@ class HueBridge():
         self.__rulesToCreate = []
         self.__sensorsToDelete = []
         self.__sensorsToCreate = []
+        self.__sensorsToUpdate = []
         self.__sensorsForGroups = {}
         self.__schedulesToDelete = []
         self.__schedulesToCreate = []
@@ -274,7 +275,7 @@ class HueBridge():
         if tmp.status_code != 200:
             print("Data:", sensorData)
             raise Exception("Cannot create sensor " + name + ": " + tmp.text)
-        result = json.loads(tmp.text)[0];
+        result = json.loads(tmp.text)[0]
         if not "success" in result:
             print("Data:", sensorData)
             raise Exception("Cannot create sensor " + name + ": " + tmp.text)
@@ -284,6 +285,22 @@ class HueBridge():
         self.__sensors[sensorID] = sensorData
         print("Created sensor", sensorID, name)
         return sensorID
+
+    def __updateSensor(self, sensorID, sensorData):
+        name = self.__sensors[sensorID]["name"]
+        tmp = requests.put(self.urlbase + "/sensors/" + str(sensorID), json=sensorData)
+        if tmp.status_code != 200:
+            print("Data:", sensorData)
+            raise Exception("Cannot update sensor " + name + ": " + tmp.text)
+        result = json.loads(tmp.text)[0]
+        if not "success" in result:
+            print("Data:", sensorData)
+            raise Exception("Cannot create sensor " + name + ": " + tmp.text)
+        self.__sensors_idx[name] = sensorID
+        # TODO merge sensor data into self.__sensors?
+        #sensorData["owner"] = self.apiKey
+        #self.__sensors[sensorID] = sensorData -- this is wrong, needs to merge
+        print("Updated sensor", sensorID, name)
 
     def __setGroupSensor(self, groupID, sensors):
         sensorData = {"sensors": sensors}
@@ -2056,34 +2073,43 @@ class HueBridge():
     def __prepareSensor(self, v, flag_only = False):
         name = v["name"]
         s = self.findSensor(name)
+        requested_type = "CLIPGenericStatus"
+        state = {"status": 0}
+        if flag_only:
+            requested_type = "CLIPGenericFlag"
+            state = {"flag": False}
         if s:
             sensor_type = self.__sensors[s]["type"]
             if sensor_type != "CLIPGenericFlag" and sensor_type != "CLIPGenericStatus":
                 raise Exception("Sensor '" + name + "' is not a generic status sensor, found " + sensor_type)
+            if sensor_type == requested_type:
+                # sensor is already the correct one, no need to delete it
+                self.__sensorsToUpdate.append([s, {"state": state}])
+                self.__rulesToDelete += self.findRulesForSensorID(s)
+                self.__ruleForSensorReset(v)
+                if v["type"] == "contact":
+                    self.__rulesForContact(v)
+                return
             self.__sensorsToDelete.append(s)
             self.__rulesToDelete += self.findRulesForSensorID(s)
         sensorData = {
-            "state": {
-                "status": 0
-            },
+            "state": state,
             "config": {
                 "on": True,
                 "reachable": True
             },
             "name": name,
-            "type": "CLIPGenericStatus",
+            "type": requested_type,
             "modelid": "GenericCLIP",
             "manufacturername": "Philips",
             "swversion": "1.0",
             "uniqueid": name
         }
         if flag_only:
-            sensorData["type"] = "CLIPGenericFlag"
+            # TODO is this model ID/unique ID handling still relevant?
             sensorData["modelid"] = "WAKEUP"
             sensorData["swversion"] = "A_1801260942"
             sensorData["uniqueid"] = "L_04_" + name
-            del sensorData["state"]["status"]
-            sensorData["state"]["flag"] = False
         self.__sensorsToCreate.append(sensorData)
         self.__ruleForSensorReset(v)
         if v["type"] == "contact":
@@ -2365,21 +2391,22 @@ class HueBridge():
             for i in self.__scenesToDelete[gid]:
                 sceneID = self.__deleteScene(gid, i)
 
-        if self.__linkToDelete:
-            print("Resource link to delete:", self.__linkToDelete)
-            self.__deleteResourceLink(self.__linkToDelete)
-
         # collects all resources created here to present them as one resource link
         links = []
         currentData = None
 
         try:
-            # create any sensors needed to represent switch states
+            # create/update any sensors needed to represent switch states
             #print("Sensors to create:")
             #pprint.pprint(self.__sensorsToCreate)
             for i in self.__sensorsToCreate:
                 currentData = i
                 sensorID = self.__createSensor(i)
+                links.append("/sensors/" + sensorID)
+            for i in self.__sensorsToUpdate:
+                currentData = i
+                sensorID = i[0]
+                self.__updateSensor(sensorID, i[1])
                 links.append("/sensors/" + sensorID)
 
             # set group's sensors
@@ -2431,6 +2458,13 @@ class HueBridge():
             if not "success" in result:
                 raise Exception("Cannot create resource link " + name + ": " + tmp.text)
             print("Created resource link " + name + " with ID " + result["success"]["id"])
+
+            # delete the link at the end, since otherwise we'd lose temporarily unreferenced resources
+            if self.__linkToDelete:
+                print("Resource link to delete:", self.__linkToDelete)
+                self.__deleteResourceLink(self.__linkToDelete)
+
+            # TODO missing adding new resource link information to the data set
 
             # at the end, make sure the variables are cleaned, since we committed all changes
             self.__prepare()
