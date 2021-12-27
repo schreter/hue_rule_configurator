@@ -135,7 +135,7 @@ class HueBridge():
                 self.__scenes_idx[g][n] = i
         self.__rules = self.__all["rules"]
         self.__schedules = self.__all["schedules"]
-        self.__schedules_idx = HueBridge.__make_index(self.__schedules, "schedules", [], False)
+        self.__schedules_idx = HueBridge.__make_index(self.__schedules, "schedules", [])
         
         self.__extinput = self.findSensor('ExternalInput')
         if not self.__extinput:
@@ -218,19 +218,33 @@ class HueBridge():
         return idSet
     
     @staticmethod
-    def __make_index(array, tp, ignore = [], unique = True):
+    def __make_index(array, tp, ignore = []):
         index = {}
+        duplicates = {}
         for i in array.keys():
             s = array[i]
             n = s["name"].strip()
             if not n in ignore:
                 if n in index:
-                    if unique:
-                        raise Exception("Duplicate " + tp + " name '" + n + "' in " + tp + ", indices " + index[n] + " and " + i)
+                    if n in duplicates:
+                        duplicates[n].append(i)
                     else:
-                        print("WARNING: Duplicate " + tp + " name '" + n + "' in " + tp + ", indices " + index[n] + " and " + i)
+                        duplicates[n] = [i]
+                    print("WARNING: Duplicate " + tp + " name '" + n + "' in " + tp + ", indices " + index[n] + " and " + i)
                 else:
                     index[n] = i
+
+        # now resolve duplicates
+        for n in duplicates.keys():
+            list = duplicates[n]
+            original_id = index[n]
+            list.append(original_id)
+            del index[n]
+            for id in list:
+                name = n + "__" + str(id)
+                if name in index:
+                    raise Exception("Cannot resolve duplicates for '" + n + "', since adjusted name '" + name + "' already exists")
+                index[name] = id
         return index
     
     def __get(self, resource):
