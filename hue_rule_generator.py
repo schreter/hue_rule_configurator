@@ -740,6 +740,7 @@ CONFIG_KIND1 = [
                 "type": "scene",
                 "state": "Julia state",
                 "reset": "off",
+                "sensor_on": "Julia sensor",
                 "configs": [
                     {"scene": "Concentrate"},
                     {"scene": "Read"},
@@ -757,7 +758,11 @@ CONFIG_KIND1 = [
                 # When in second state (night light), turn off after 20 minutes
                 "value": "Nachtlicht",
                 "timeout": "00:20:00",
-                "action": "toggle"
+                "action": "toggle",
+                # Turn off the sensor for this toggle when the night light is switched on
+                # to prevent turning off the night light via sensor timeout. The sensor will
+                # reactivate itself after the light is turned off.
+                "sensor_off": "Julia sensor"
             }
         }
     }
@@ -825,6 +830,7 @@ CONFIG_KIND2 = [
                 "type": "scene",
                 "state": "Katarina state",
                 "reset": "off",
+                "sensor_on": "Katarina sensor",
                 "configs": [
                     {"scene": "Hell"},
                     {"scene": "Lesen"},
@@ -839,7 +845,8 @@ CONFIG_KIND2 = [
                 "type": "scene",
                 "value": "Nachtlicht", 
                 "timeout": "00:20:00",
-                "action": "toggle"
+                "action": "toggle",
+                "sensor_off": "Katarina sensor",
             }
         }
     }
@@ -925,6 +932,7 @@ CONFIG_B = [
             "61": {
                 "type": "scene",
                 "reset": "off",
+                "sensor_on": "Schlafzimmer sensor",
                 "configs": [
                     {"scene": "Concentrate"},
                     {"scene": "Relax"},
@@ -943,7 +951,8 @@ CONFIG_B = [
                 "type": "scene",
                 "value": "Nightlight", 
                 "timeout": "00:20:00",
-                "action": "toggle"
+                "action": "toggle",
+                "sensor_off": "Schlafzimmer sensor",
             }
         }
     }

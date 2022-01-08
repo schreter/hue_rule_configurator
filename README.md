@@ -269,6 +269,11 @@ when to turn it off (e.g., `W124/T05:00:00` to turn it off on weekdays at 5:00 a
 the sensor will remain deactivated until the first time the light is turned off (likely after
 the person woke up and ultimately turned off the light).
 
+Additionally, the sensor can be reactivated in response to a switch inside of switch binding
+configuration via `sensor_on` for scene actions or turned off via `sensor_off` for toggle actions
+(e.g., night light toggle to prevent turning off the night light during its timeout). See
+the example configuration for details.
+
 
 ## Action types
 

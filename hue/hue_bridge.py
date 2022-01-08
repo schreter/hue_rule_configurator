@@ -547,9 +547,9 @@ class HueBridge():
                     "status": "enabled",
                     "conditions": [
                         {
-                            "address": "/sensors/${sensor:" + name + "}/state/status",
+                            "address": "/sensors/${sensor:" + name + "}/state/flag",
                             "operator": "eq",
-                            "flag": not i[2]
+                            "value": "true" if not i[2] else "false"
                         },
                         {
                             "address": "/sensors/" + self.__extinput + "/state/status",
@@ -742,12 +742,42 @@ class HueBridge():
                         }
                     )
 
+        sensorActions = []
+        if "sensor_on" in binding:
+            # reactivate sensor(s) when this binding is invoked
+            sensors = binding["sensor_on"]
+            if not isinstance(sensors, list):
+                sensors = [sensors]
+            for name in sensors:
+                sensorActions.append(
+                    {
+                        "address": "/sensors/${sensor:" + name + "}/config",
+                        "method": "PUT",
+                        "body": { "on": True }
+                    }
+                )
+
         toggleCond = []
         if "action" in binding:
             action = binding["action"]
             if action != "toggle":
                 raise Exception("Currently only 'toggle' action is supported for scene " + name + "/" + ref)
-            
+
+            sensorOffActions = []
+            if "sensor_off" in binding:
+                # deactivate sensor(s) when toggled off and sensor off requested (e.g., night light)
+                sensors = binding["sensor_off"]
+                if not isinstance(sensors, list):
+                    sensors = [sensors]
+                for name in sensors:
+                    sensorOffActions.append(
+                        {
+                            "address": "/sensors/${sensor:" + name + "}/config",
+                            "method": "PUT",
+                            "body": { "on": False }
+                        }
+                    )
+
             # toggle action - only use the rules if the light is off
             toggleCond = [
                 {
@@ -764,7 +794,7 @@ class HueBridge():
                         "operator": "eq",
                         "value": "true"
                     }],
-                "actions": resetstateactions + [
+                "actions": resetstateactions + sensorActions + [
                     {
                         "address": "/groups/" + groupID + "/action",
                         "method": "PUT",
@@ -775,6 +805,10 @@ class HueBridge():
                 ]
             }
             self.__rulesToCreate.append(rule)
+
+            # NOTE: remaining actions will be run only when toggle on, so the actions to
+            # turn off the sensor will be used for them (turn on the sensor is used above).
+            sensorActions = sensorOffActions
 
         if "setstate" in binding:
             if not "state" in state:
@@ -794,7 +828,7 @@ class HueBridge():
 
         for config in configs:
             print("Process",name,index,config)
-            cname = name + "/" + ref;
+            cname = name + "/" + ref
             nextIndex = index + 1
             prevIndex = index
             if "times" in binding:
@@ -830,7 +864,7 @@ class HueBridge():
                                 "status": -nextIndex if secondaryState else nextIndex
                             }
                         }
-                    ]
+                    ] + sensorActions
                     self.__singleSceneRules(config, cname, state, stateCond + conditions + toggleCond, stateAction + actions)
                 
             if "times" in binding:
@@ -891,7 +925,7 @@ class HueBridge():
                                         "status": -nextIndex if secondaryState else nextIndex
                                     }
                                 }
-                            ]
+                            ] + sensorActions
                         self.__singleSceneRules(config, cname + "/T" + str(tidx), state, conditions + stateCond + toggleCond, stateAction + actions)
                     tidx = tidx + 1
             elif index == 0:
@@ -918,7 +952,7 @@ class HueBridge():
                                 "status": -1 if secondaryState else 1
                             }
                         }
-                    ]
+                    ] + sensorActions
                     self.__singleSceneRules(config, cname + "/in", state, conditions + stateCond + toggleCond, actions + stateAction)
                 else:
                     # single config, no additional conditions
@@ -936,7 +970,7 @@ class HueBridge():
                         else:
                             print("WARNING: single-scene timeout on '" + name + "' will not be interrupted by changing light state by unrelated action, use state variable")
                             stateactions = []
-                    self.__singleSceneRules(config, cname, state, conditions + toggleCond, stateactions + actions)
+                    self.__singleSceneRules(config, cname, state, conditions + toggleCond, stateactions + sensorActions + actions)
 
             if "timeout" in config:
                 # create extra rule to turn off light in this state
@@ -1470,8 +1504,8 @@ class HueBridge():
                 addr = "/sensors/" + id + "/config"
                 self.__schedulesToCreate.append(
                     {
-                        "name": name + "/sens" + id + ".off",
-                        "description": name + " off " + id + " (timed reset)",
+                        "name": name + " " + id + ".off",
+                        "description": name + " " + id + " off (timed reset)",
                         "status": "enabled",
                         "recycle": True,
                         "localtime": scheduled_time,
