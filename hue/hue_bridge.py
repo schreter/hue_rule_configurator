@@ -326,7 +326,7 @@ class HueBridge():
         if tmp.status_code != 200:
             print("Data:", sensorData)
             raise Exception("Cannot assign sensors to group " + groupID + ": " + tmp.text)
-        result = json.loads(tmp.text)[0];
+        result = json.loads(tmp.text)[0]
         if not "success" in result:
             print("Data:", sensorData)
             raise Exception("Cannot assign sensors to group " + groupID + ": " + tmp.text)
@@ -357,6 +357,7 @@ class HueBridge():
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
         result = json.loads(tmp.text)[0];
         if not "success" in result:
+            print("Data:", ruleData)
             raise Exception("Cannot create rule " + name + ": " + tmp.text)
         ruleID = result["success"]["id"]
         ruleData["owner"] = self.apiKey
@@ -1351,14 +1352,21 @@ class HueBridge():
         name = desc["name"]
         if not "group" in state:
             raise Exception("No group set for motion sensor '" + name + "'")
-        groupName = state["group"]
-        groupID = self.__groups_idx[groupName]
+        sensorGroupName = state["group"]
+        sensorGroupID = self.__groups_idx[sensorGroupName]
+        lightGroupName = sensorGroupName
+        lightGroupID = sensorGroupID
         bindings = desc["bindings"]
         stateSensorName = name + " state"
 
+        if "lightgroup" in desc:
+            lightGroupName = desc["lightgroup"]
+            lightGroupID = self.__groups_idx[lightGroupName]
+        print("Motion " + name + " using light group " + lightGroupID + "/" + lightGroupName + ", sensor group " + sensorGroupID + "/" + sensorGroupName)
+
         # determine whether to use group or single sensor
-        presenceSensorAddress = "/groups/" + groupID + "/presence/state/presence"
-        darkSensorAddress = "/groups/" + groupID + "/lightlevel/state/dark"
+        presenceSensorAddress = "/groups/" + sensorGroupID + "/presence/state/presence"
+        darkSensorAddress = "/groups/" + sensorGroupID + "/lightlevel/state/dark"
         if "sensors" in desc:
             # use sensor array
             groupSensors = []
@@ -1368,7 +1376,7 @@ class HueBridge():
                 self.__rulesToDelete += self.findRulesForSensorID(dsid)
                 # assign sensors to the group
                 groupSensors += [psid, dsid]
-            self.__sensorsForGroups[groupID] = groupSensors
+            self.__sensorsForGroups[sensorGroupID] = groupSensors
         else:
             # single sensor
             psid, dsid = self.__findMotionSensor(name)
@@ -1385,19 +1393,19 @@ class HueBridge():
         
         # recovery scene handling
         sceneName = name + " recover"
-        self.__prepareDeleteScene(groupID, sceneName)
+        self.__prepareDeleteScene(lightGroupID, sceneName)
         sceneID = None
         if not "recover" in bindings:
             # create new scene for the group to store light state to recover, but only if needed
             body = {
                 "name": sceneName,
-                "lights": self.__groups[groupID]["lights"]
-                #"group": groupID
+                "lights": self.__groups[lightGroupID]["lights"]
+                #"group": lightGroupID
             }
-            if not groupID in self.__scenesToCreate:
-                self.__scenesToCreate[groupID] = []
-            self.__scenesToCreate[groupID].append(body)
-            sceneID = "${scene:" + groupName + ":" + sceneName + "}"
+            if not lightGroupID in self.__scenesToCreate:
+                self.__scenesToCreate[lightGroupID] = []
+            self.__scenesToCreate[lightGroupID].append(body)
+            sceneID = "${scene:" + lightGroupName + ":" + sceneName + "}"
 
         onactions = None
         offactions = None
@@ -1473,7 +1481,7 @@ class HueBridge():
             # a situation where light on redirects to a rule is after light off rule,
             # effectively making turning light off impossible.
             {
-                "address": "/groups/${group:" + groupName + "}/state/any_on",
+                "address": "/groups/${group:" + lightGroupName + "}/state/any_on",
                 "operator": "stable",
                 "value": "PT00:00:01"
             }
@@ -1606,7 +1614,7 @@ class HueBridge():
             })
         if not dimactions:
             actionstodim.append({
-                "address": "/groups/" + groupID + "/action",
+                "address": "/groups/" + lightGroupID + "/action",
                 "method": "PUT",
                 "body": {
                     "bri_inc": -128 # dim to half
@@ -1737,7 +1745,7 @@ class HueBridge():
                 "conditions": conditions,
                 "actions" : actions + [
                     {
-                        "address": "/groups/" + groupID + "/action",
+                        "address": "/groups/" + lightGroupID + "/action",
                         "method": "PUT",
                         "body": {
                             "on": False
@@ -1788,7 +1796,7 @@ class HueBridge():
                 "name": name + "/recover",
                 "conditions": conditions,
                 "actions": [{
-                    "address": "/groups/" + groupID + "/action",
+                    "address": "/groups/" + lightGroupID + "/action",
                     "method": "PUT",
                     "body": {
                         "scene": sceneID
@@ -1818,12 +1826,12 @@ class HueBridge():
                         "value": "2"
                     },
                     {
-                        "address": "/groups/" + groupID + "/state/any_on",
+                        "address": "/groups/" + lightGroupID + "/state/any_on",
                         "operator": "eq",
                         "value": "true"
                     },
                     {
-                        "address": "/groups/" + groupID + "/state/any_on",
+                        "address": "/groups/" + lightGroupID + "/state/any_on",
                         "operator": "dx"
                     }
                 ] + contactOpenCond
@@ -1850,12 +1858,12 @@ class HueBridge():
                         "value": "-1"
                     },
                     {
-                        "address": "/groups/" + groupID + "/state/any_on",
+                        "address": "/groups/" + lightGroupID + "/state/any_on",
                         "operator": "eq",
                         "value": "false"
                     },
                     {
-                        "address": "/groups/" + groupID + "/state/any_on",
+                        "address": "/groups/" + lightGroupID + "/state/any_on",
                         "operator": "dx"
                     }
                 ] 
@@ -1968,12 +1976,12 @@ class HueBridge():
             # rule(14): after manually switched on when door closed, set door closed again to force reevaluation via rule(12)
             conditions = [
                 {
-                    "address": "/groups/" + groupID + "/state/any_on",
+                    "address": "/groups/" + lightGroupID + "/state/any_on",
                     "operator": "eq",
                     "value": "true"
                 },
                 {
-                    "address": "/groups/" + groupID + "/state/any_on",
+                    "address": "/groups/" + lightGroupID + "/state/any_on",
                     "operator": "dx"
                 }
             ] + contactClosedCond
@@ -2062,7 +2070,7 @@ class HueBridge():
                     "name": name + "/open.recover",
                     "conditions": conditions,
                     "actions": [{
-                        "address": "/groups/" + groupID + "/action",
+                        "address": "/groups/" + lightGroupID + "/action",
                         "method": "PUT",
                         "body": {
                             "scene": sceneID

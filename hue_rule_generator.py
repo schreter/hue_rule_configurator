@@ -45,6 +45,25 @@ CONFIG_LR = [
             "blr": { "type": "redirect", "value": "19" }
         }
     },
+    # Smart button to turn on/off the light above the cabinet
+    {
+        "type": "switch",
+        "name": "Bücherregal Button",
+        "bindings": {
+            "on": {
+                "type": "scene",                # group action 
+                "group": "Bücherregal",         # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
+            },
+            "on-hold": {
+                "type": "scene",                # group action 
+                "group": "Bücherregal",         # group to manage
+                "value": "Concentrate",         # scene to set
+                "action": "toggle"              # toggle between on/off states only (single config)
+            }
+        }
+    },
     # Actions for external input from an Enocean switch (similar to Philips Tap)
     # We also redirect actions from Philips switch above to these actions in order
     # to spare rules created on the bridge and not to duplicate the configuration.
@@ -112,6 +131,19 @@ CONFIG_LR = [
             # Instead of handling it here, it's moved below to kitchen configuration,
             # since it's more natural. But, it could be defined here as well.
         }
+    },
+    # Sensor to turn off the light if there is no activity in the dining room or living room
+    {
+        "type": "motion",
+        "name": "Wohnzimmer sensor",
+        "sensors": ["Essen sensor", "Wohnzimmer sensor", "Bücherregal sensor"], # use two sensors in parallel
+        # Assign sensors to the group
+        "group": "Wohnzimmer und Essen",
+        "lightgroup": "Wohnzimmer",
+        "timeout": "00:09:30",
+        "dimtime": "00:00:20",
+        "state": "Wohnzimmer state",
+        "bindings": {}
     }
 ]
 
@@ -293,6 +325,19 @@ CONFIG_DINING = [
                 "type": "off"
             }
         }
+    },
+    # Sensor to turn off the light if there is no activity in the kitchen, dining room or living room
+    {
+        "type": "motion",
+        "name": "Essen sensor",
+        "sensors": ["Essen sensor", "Küche sensor", "Wohnzimmer sensor", "Bücherregal sensor"], # use two sensors in parallel
+        # Assign sensors to the group
+        "group": "Küche und Essen",
+        "lightgroup": "Essen",
+        "timeout": "00:09:30",
+        "dimtime": "00:00:20",
+        "state": "Essen state",
+        "bindings": {}
     }
 ]
 
@@ -731,7 +776,7 @@ CONFIG_KIND2 = [
             "br": { "type": "dim", "value": -50, "tt": 5 }
         }
     },
-    # Contact sensor (driven directly by OpenHAB), to detect whether the door is open or closed.
+    # Contact sensor (driven directly by HomeKit), to detect whether the door is open or closed.
     {
         "type": "contact",
         "name": "Katarina door contact"
@@ -826,6 +871,30 @@ CONFIG_B = [
             "on": { "type": "redirect", "value": "61" },
             "off": { "type": "redirect", "value": "62" },
             **HueBridge.DIMMER_RULES
+        }
+    },
+    # Contact sensor (driven directly by HomeKit), to detect whether the door is open or closed.
+    {
+        "type": "contact",
+        "name": "Schlafzimmer door contact"
+    },
+    # Motion sensor to turn light off automatically.
+    {
+        "type": "motion",
+        "name": "Schlafzimmer sensor",
+        "group": "Schlafzimmer",
+        "timeout": "00:04:45",
+        "dimtime": "00:00:15",
+        "state": "Schlafzimmer state",
+        # Cooperate with the contact to prevent turning lights off when door is closed and
+        # someone is inside. Similarly, if there is no motion whatsoever after
+        # closing the door, turn lights off shortly after.
+        "contact": "Schlafzimmer door contact",
+        # Force timeout even on closed door contact after 40 minutes. This is a safety net
+        # if the contact breaks. Any motion within this time period will reset the timer.
+        "closedtimeout": "00:40:00",
+        "bindings": {
+            # no bindings, just turn the light off after timeout
         }
     },
     {

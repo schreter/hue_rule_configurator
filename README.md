@@ -257,7 +257,12 @@ a bug in Hue bridge which fails to process the no-presence rule if the light is 
 won't turn it off after a timeout. However, motion in front of the sensor or triggering any
 other rules for the sensor (e.g., manually turning off the light) will clean up the state and
 the sensor will work as expected.
- 
+
+Sensor `group` indicates the group/room in which the sensor or multiple sensors are located.
+This is by default also the light group to control. However, this can be overridden by specifying
+`lightgroup` explicitly to a different value. Then, this light group will be checked and
+controlled.
+
 
 ## Action types
 
