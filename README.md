@@ -263,6 +263,12 @@ This is by default also the light group to control. However, this can be overrid
 `lightgroup` explicitly to a different value. Then, this light group will be checked and
 controlled.
 
+Sometimes it is necessary to disable the sensor, e.g., before wake up light activates. This
+can be done by adding `sensor_off` tag to the motion sensor configuration with the time schedule
+when to turn it off (e.g., `W124/T05:00:00` to turn it off on weekdays at 5:00 am). In this case,
+the sensor will remain deactivated until the first time the light is turned off (likely after
+the person woke up and ultimately turned off the light).
+
 
 ## Action types
 

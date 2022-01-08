@@ -717,7 +717,11 @@ CONFIG_KIND1 = [
         "closedtimeout": "00:20:00",
         "bindings": {
             # no bindings, just turn the light off after timeout
-        }
+        },
+        # Turn off the sensor at the specified time.
+        # Turning off the light afterwards will reactivate it.
+        # Turning on the light using the switch will also reactivate it (see sensor_on).
+        "sensor_off": "W124/T05:00:00"
     },
     {
         "type": "state",
@@ -793,12 +797,16 @@ CONFIG_KIND2 = [
         # someone is inside. Similarly, if there is no motion whatsoever after
         # closing the door, turn lights off shortly after.
         "contact": "Katarina door contact",
-        # Force timeout even on closed door contact after 20 minutes. This is a safety net
+        # Force timeout even on closed door contact after 40 minutes. This is a safety net
         # if the contact breaks. Any motion within this time period will reset the timer.
-        "closedtimeout": "00:20:00",
+        "closedtimeout": "00:40:00",
         "bindings": {
             # no bindings, just turn the light off after timeout
-        }
+        },
+        # Turn off the sensor at the specified time.
+        # Turning off the light afterwards will reactivate it.
+        # Turning on the light using the switch will also reactivate it (see sensor_on).
+        "sensor_off": "W124/T05:00:00"
     },
     {
         "type": "state",
@@ -895,7 +903,11 @@ CONFIG_B = [
         "closedtimeout": "00:40:00",
         "bindings": {
             # no bindings, just turn the light off after timeout
-        }
+        },
+        # Turn off the sensor at the specified time.
+        # Turning off the light afterwards will reactivate it.
+        # Turning on the light using the switch will also reactivate it (see sensor_on).
+        "sensor_off": "W124/T05:00:00"
     },
     {
         "type": "state",

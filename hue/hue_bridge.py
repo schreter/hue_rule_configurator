@@ -14,6 +14,8 @@ SCENE_PATTERN = re.compile("^([^:]+):(.*)$")
 OFF_BINDING = { "type": "scene", "configs": [ {"scene": "off"} ] }
 MATCH_HUEAPP_SCENEDATA = re.compile('^(.....)_r([0-9][0-9])_d([0-9][0-9])$')
 
+verbose = False
+
 BUTTON_MAP = {
     # mapping for dimmer
     "on": "1000",
@@ -138,7 +140,7 @@ class HueBridge():
                 if not g:
                     print("Warning: missing group ID for scene '" + n + "', lights", lights, "(ignoring)")
                     continue
-                else:
+                elif verbose:
                     print("NOTE: Found group ID " + g + " for light scene " + n)
             else:
                 g = s["group"]
@@ -183,8 +185,10 @@ class HueBridge():
             print("Using external input sensor ", self.__extinput)
         for i in self.__scenes_idx:
             mapper = lambda x : (x if "group" in self.__scenes[self.__scenes_idx[i][x]] else x + "*") + " @ " + self.__scenes_idx[i][x]
-            print("Scenes for group", self.__groups[i]["name"] + " (" + i + "):", [mapper(x) for x in sorted(self.__scenes_idx[i].keys())])
-        print("Sensors:", sorted(self.__sensors_idx.keys()))
+            if verbose:
+                print("Scenes for group", self.__groups[i]["name"] + " (" + i + "):", [mapper(x) for x in sorted(self.__scenes_idx[i].keys())])
+        if verbose:
+            print("Sensors:", sorted(self.__sensors_idx.keys()))
 
         self.__prepare()
 
@@ -1341,6 +1345,10 @@ class HueBridge():
             rule(14): after manually switched on when door closed, change to state 2 (will fall to 1 on no motion)
                 and set door closed again to force reevaluation via rule(12)
 
+        If `sensor_off` if used:
+            schedule (one per sensor): when the time is reached, the sensor is configured to off
+            rule(15): when the light is turned off, the sensor is configured back to on
+
         Motion sensor supports following bindings:
             - "on" - turn on the lights
             - "off" - turn off the lights (default: all lights in the group off)
@@ -1367,11 +1375,13 @@ class HueBridge():
         # determine whether to use group or single sensor
         presenceSensorAddress = "/groups/" + sensorGroupID + "/presence/state/presence"
         darkSensorAddress = "/groups/" + sensorGroupID + "/lightlevel/state/dark"
+        presenceSensorList = []
         if "sensors" in desc:
             # use sensor array
             groupSensors = []
             for sensor in desc["sensors"]:
                 psid, dsid = self.__findMotionSensor(sensor)
+                presenceSensorList.append(psid)
                 self.__rulesToDelete += self.findRulesForSensorID(psid)
                 self.__rulesToDelete += self.findRulesForSensorID(dsid)
                 # assign sensors to the group
@@ -1380,6 +1390,7 @@ class HueBridge():
         else:
             # single sensor
             psid, dsid = self.__findMotionSensor(name)
+            presenceSensorList.append(psid)
             self.__rulesToDelete += self.findRulesForSensorID(psid)
             self.__rulesToDelete += self.findRulesForSensorID(dsid)
             presenceSensorAddress = "/sensors/" + psid + "/state/presence"
@@ -1451,6 +1462,52 @@ class HueBridge():
                     "value": "true"
                 }]
 
+        if "sensor_off" in desc:
+            # handle turning off the sensor at the specified time and back on on light off
+            scheduled_time = desc["sensor_off"]
+            sensorOnActions = []
+            for id in presenceSensorList:
+                addr = "/sensors/" + id + "/config"
+                self.__schedulesToCreate.append(
+                    {
+                        "name": name + "/sens" + id + ".off",
+                        "description": name + " off " + id + " (timed reset)",
+                        "status": "enabled",
+                        "recycle": True,
+                        "localtime": scheduled_time,
+                        "command": {
+                            "address": addr,
+                            "body": {"on": False},
+                            "method": "PUT"
+                        }
+                    }
+                )
+                sensorOnActions.append(
+                    {
+                        "address": addr,
+                        "body": {"on": True},
+                        "method": "PUT"
+                    }
+                )
+
+            # rule(15): reactivate when light turned off
+            self.__rulesToCreate.append(
+                {
+                    "name": name + "/sens.on",
+                    "actions" : sensorOnActions,
+                    "conditions" : [
+                        {
+                            "address": "/groups/" + lightGroupID + "/state/any_on",
+                            "operator": "eq",
+                            "value": "false"
+                        },
+                        {
+                            "address": "/groups/" + lightGroupID + "/state/any_on",
+                            "operator": "dx"
+                        }
+                    ]
+                }
+            )
 
         # handling for states <=0
         
