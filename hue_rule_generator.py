@@ -132,11 +132,17 @@ CONFIG_LR = [
             # since it's more natural. But, it could be defined here as well.
         }
     },
+    # Contact sensor driven by HomeKit, set when all doors on living room and kitchen closed
+    {
+        "type": "contact",
+        "name": "Wohnküche Tür",
+    },
     # Sensor to turn off the light if there is no activity in the dining room or living room
     {
         "type": "motion",
         "name": "Wohnzimmer sensor",
         "sensors": ["Essen sensor", "Wohnzimmer sensor", "Bücherregal sensor"], # use two sensors in parallel
+        "contact": "Wohnküche Tür",
         # Assign sensors to the group
         "group": "Wohnzimmer und Essen",
         "lightgroup": "Wohnzimmer",
@@ -337,6 +343,7 @@ CONFIG_DINING = [
         "timeout": "00:09:30",
         "dimtime": "00:00:20",
         "state": "Essen state",
+        "contact": "Wohnküche Tür", # uses the same door sensor as living room
         "bindings": {}
     }
 ]
