@@ -1510,7 +1510,7 @@ class HueBridge():
                         "recycle": True,
                         "localtime": scheduled_time,
                         "command": {
-                            "address": addr,
+                            "address": "/api/0" + addr,
                             "body": {"on": False},
                             "method": "PUT"
                         }
