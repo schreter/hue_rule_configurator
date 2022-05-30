@@ -50,18 +50,8 @@ CONFIG_LR = [
         "type": "switch",
         "name": "Bücherregal Button",
         "bindings": {
-            "on": {
-                "type": "scene",                # group action 
-                "group": "Bücherregal",         # group to manage
-                "value": "Concentrate",         # scene to set
-                "action": "toggle"              # toggle between on/off states only (single config)
-            },
-            "on-hold": {
-                "type": "scene",                # group action 
-                "group": "Bücherregal",         # group to manage
-                "value": "Concentrate",         # scene to set
-                "action": "toggle"              # toggle between on/off states only (single config)
-            }
+            "on": { "type": "redirect", "value": "17" },
+            "on-hold": { "type": "redirect", "value": "18" },
         }
     },
     # Actions for external input from an Enocean switch (similar to Philips Tap)
@@ -130,6 +120,21 @@ CONFIG_LR = [
             # We also have external action "11" sent by the switch in the living room.
             # Instead of handling it here, it's moved below to kitchen configuration,
             # since it's more natural. But, it could be defined here as well.
+        }
+    },
+    # Light above the cabinet
+    {
+        "type": "external",
+        "group": "Bücherregal",         # group to manage
+        "name": "Bücherregal Button",
+        "bindings": {
+            "17": {
+                "type": "scene",
+                "value": "Concentrate"
+            },
+            "18": {
+                "type": "off"
+            }
         }
     },
     # Contact sensor driven by HomeKit, set when all doors on living room and kitchen closed
@@ -481,6 +486,24 @@ CONFIG_WC = [
                 }
             },
             "109": { "type": "off" }
+        }
+    }
+]
+
+# Configuration for the patio
+CONFIG_PATIO = [
+    {
+        "type": "external",
+        "name": "Terrasse",
+        "group": "Terrasse",
+        "bindings": {
+            "150": {
+                "type": "scene",
+                "value": "Concentrate"
+            },
+            "151": {
+                "type": "off"
+            }
         }
     }
 ]
@@ -1212,6 +1235,7 @@ if __name__ == '__main__':
     h.configure(CONFIG_DINING, "Esszimmer")
     h.configure(CONFIG_AZ, "Arbeitszimmer")
     h.configure(CONFIG_WC, "Gäste-WC")
+    h.configure(CONFIG_PATIO, "Terrasse")
     h.configure(CONFIG_HWEGUG, "Flure")
     h.configure(CONFIG_HWR, "HWR")
     h.configure(CONFIG_BASEMENT, "Keller")
